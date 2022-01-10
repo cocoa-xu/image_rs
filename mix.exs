@@ -21,7 +21,7 @@ defmodule ImgDecode.MixProject do
   end
 
   defp description() do
-    "A tiny Elixir library for image decoding task."
+    "A tiny Elixir library for image decoding task with image_rs as the backend."
   end
 
   defp deps do
