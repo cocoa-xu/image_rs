@@ -1,0 +1,40 @@
+name: macos
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - dev
+    paths-ignore:
+      - '**/README.md'
+      - '.github/workflows/linux*'
+  workflow_dispatch:
+
+jobs:
+  mix_test:
+    runs-on: macos-11
+    env:
+      MIX_ENV: test
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Erlang and Elixir
+        run: |
+          brew install erlang elixir libomp
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Compile and Test
+        run: |
+          mix deps.get
+          mix deps.compile
+          mix compile
+          mix test
