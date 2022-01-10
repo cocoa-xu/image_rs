@@ -1,16 +1,17 @@
 defmodule ImgDecode.MixProject do
   use Mix.Project
 
+  @github_url "https://github.com/cocoa-xu/image_rs"
   def project do
     [
-      app: :img_decode_rs,
+      app: :image_rs,
       version: "0.1.0",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       description: description(),
       package: package(),
       deps: deps(),
-      source_url: "https://github.com/cocoa-xu/img_decode_rs"
+      source_url: @github_url
     ]
   end
 
@@ -33,10 +34,10 @@ defmodule ImgDecode.MixProject do
 
   defp package() do
     [
-      name: "img_decode_rs",
+      name: "image_rs",
       files: ~w(native lib .formatter.exs mix.exs),
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/cocoa-xu/img_decode_rs"}
+      links: %{"GitHub" => @github_url}
     ]
   end
 end

@@ -167,7 +167,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "img_decode_rs"
+name = "image_rs_nif"
 version = "0.1.0"
 dependencies = [
  "image",

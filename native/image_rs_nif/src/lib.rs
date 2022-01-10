@@ -44,4 +44,4 @@ fn from_memory(buffer: Binary) -> Result<ElixirImageResultTuple, &'static str> {
     }
 }
 
-rustler::init!("Elixir.ImgDecode.ImageRs", [from_file, from_memory]);
+rustler::init!("Elixir.ImageRs.Nif", [from_file, from_memory]);
