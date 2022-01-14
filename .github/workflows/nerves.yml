@@ -1,4 +1,4 @@
-name: macos
+name: nerves
 
 on:
   pull_request:
@@ -20,7 +20,7 @@ jobs:
       NERVES_PROJ_NAME: nerves_project
 
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - arch: aarch64
