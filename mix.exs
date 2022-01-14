@@ -2,7 +2,32 @@ defmodule ImgDecode.MixProject do
   use Mix.Project
 
   @github_url "https://github.com/cocoa-xu/image_rs"
+
+  @nerves_rust_target_triple_mapping %{
+    "armv6-nerves-linux-gnueabihf": "arm-unknown-linux-gnueabihf",
+    "armv7-nerves-linux-gnueabihf": "armv7-unknown-linux-gnueabihf",
+    aarch64_nerves_linux_gnu: "aarch64-unknown-linux-gnu",
+    x86_64_nerves_linux_musl: "x86_64-unknown-linux-musl"
+  }
+
   def project do
+    if is_binary(System.get_env("NERVES_SDK_SYSROOT")) do
+      components = System.get_env("CC")
+        |> tap(&System.put_env("RUSTFLAGS", "-C linker=#{&1}"))
+        |> Path.basename()
+        |> String.split("-")
+
+      target_triple =
+        components
+        |> Enum.slice(0, Enum.count(components) - 1)
+        |> Enum.join("-")
+
+      mapping = Map.get(@nerves_rust_target_triple_mapping, String.to_atom(target_triple))
+      if is_binary(mapping) do
+        System.put_env("RUSTLER_TARGET", mapping)
+      end
+    end
+
     [
       app: :image_rs,
       version: "0.1.0",
@@ -27,7 +52,7 @@ defmodule ImgDecode.MixProject do
 
   defp deps do
     [
-      {:rustler, "~> 0.23.0"},
+      {:rustler, "~> 0.23.0", github: "cocoa-xu/rustler", sparse: "rustler_mix", branch: "cross-compile"},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false}
     ]
   end

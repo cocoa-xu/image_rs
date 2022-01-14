@@ -22,62 +22,50 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        include:
-          - arch: aarch64
-            target: rpi4
-            distro: ubuntu20.04
-          - arch: armv7
-            target: rpi3a
-            distro: ubuntu20.04
-          - arch: armv7
-            target: rpi3
-            distro: ubuntu20.04
-          - arch: armv7
-            target: rpi2
-            distro: ubuntu20.04
-          - arch: armv7
-            target: bbb
-            distro: ubuntu20.04
-          - arch: armv7
-            target: osd32mp1
-            distro: ubuntu20.04
+        target: [ rpi4, rpi3a, rpi3, rpi2, rpi0, rpi, bbb, osd32mp1 ]
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: uraimo/run-on-arch-action@v2.1.1
-        name: Build artifact
-        id: build
+      - uses: erlef/setup-beam@v1
         with:
-          arch: ${{ matrix.arch }}
-          distro: ${{ matrix.distro }}
-          githubToken: ${{ github.token }}
+          otp-version: "24.1.5"
+          elixir-version: "1.12.3"
 
-          shell: /bin/bash
-          install: |
-            apt-get update -q -y
-            apt-get install -y sudo build-essential cmake gnupg2 automake autoconf pkg-config bc m4 unzip zip wget curl git libssl-dev libncurses5-dev erlang-inets erlang-os-mon erlang-runtime-tools erlang-ssl erlang-dev python3 ca-certificates erlang-parsetools
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            export OTP_VER=24.0
-            wget --no-check-certificate "https://erlang.org/download/otp_src_${OTP_VER}.tar.gz" -O "otp_src_${OTP_VER}.tar.gz"
-            tar xf "otp_src_${OTP_VER}.tar.gz"
-            cd "otp_src_${OTP_VER}"
-            export ERL_TOP=`pwd`
-            ./configure
-            make -j"$(nproc)"
-            make install
-            export PATH="/usr/local/bin:${PATH}"
-            cd ..
-            wget --no-check-certificate https://github.com/elixir-lang/elixir/releases/download/v1.13.2/Precompiled.zip -O Precompiled.zip
-            unzip -o Precompiled.zip
-            export PATH="$(pwd)/Precompiled/bin:${PATH}"
-            mix local.hex --force
-            mix local.rebar --force
-            mkdir -p ~/.ssh
-            echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCulZpVE/JdpWX53C35n45RSIMtaIIiTMnmRo5oDEMbyh0NnKI5byikkOvGnGLOO2KTlq4We+MF5iKx72B1Ixl8RY7L6Kc/h3R6jG4uOWBhw/WBhIebteJVYDzrlU8fHTewquWYT6tJ7v7g54Qe5vofsDeKBDqTJqJPlwNSxP8AjPZ0vQ4O4IhG0CXaDzU/G50sqzquKckgGWURLN9LcsA+kzciKJRhKw4Q7kpOiTNG/fzYxBpgpNrnyyr7bhj0jdOsg9KoG57aLSqbmEVCOyWa6yh6lOTp37S6ijBfQORxUu3I+6B04zUBSEvN4wgqslHU9pbIio8Szz1vbnlqsgO0tG1yqALfs6RVSjW81AujKefeH/8seE7q0yiHJXkE4tejIcewJT+2e6p/fP2pVSwyRqZ1bObtRUCMG3Pwdi0IpfsyBSa02Qc7eT9VB1WN7XD1vpfMDQ/nIWmoA40VkX3F3v5Mht5PZwVmlRyM8BrLtCYTreUP5xl6ZZCSX2IfOI8= nerves-ci-build' > ~/.ssh/id_rsa.pub
-            mix archive.install hex nerves_bootstrap --force || true
-            echo '#!/bin/bash' > /usr/bin/fwup
-            chmod +x /usr/bin/fwup
+      - name: Install nerves and system dependecies
+        run: |
+          mkdir -p ~/.ssh
+          echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCulZpVE/JdpWX53C35n45RSIMtaIIiTMnmRo5oDEMbyh0NnKI5byikkOvGnGLOO2KTlq4We+MF5iKx72B1Ixl8RY7L6Kc/h3R6jG4uOWBhw/WBhIebteJVYDzrlU8fHTewquWYT6tJ7v7g54Qe5vofsDeKBDqTJqJPlwNSxP8AjPZ0vQ4O4IhG0CXaDzU/G50sqzquKckgGWURLN9LcsA+kzciKJRhKw4Q7kpOiTNG/fzYxBpgpNrnyyr7bhj0jdOsg9KoG57aLSqbmEVCOyWa6yh6lOTp37S6ijBfQORxUu3I+6B04zUBSEvN4wgqslHU9pbIio8Szz1vbnlqsgO0tG1yqALfs6RVSjW81AujKefeH/8seE7q0yiHJXkE4tejIcewJT+2e6p/fP2pVSwyRqZ1bObtRUCMG3Pwdi0IpfsyBSa02Qc7eT9VB1WN7XD1vpfMDQ/nIWmoA40VkX3F3v5Mht5PZwVmlRyM8BrLtCYTreUP5xl6ZZCSX2IfOI8= nerves-ci-build' > ~/.ssh/id_rsa.pub
+          sudo apt-get update && sudo apt-get install -y build-essential automake autoconf pkg-config bc m4 unzip zip curl git libssl-dev libncurses5-dev erlang-inets erlang-os-mon erlang-runtime-tools erlang-ssl erlang-dev python3 ca-certificates squashfs-tools ssh-askpass
+          mix local.hex --force
+          mix local.rebar --force
+          mix archive.install hex nerves_bootstrap --force || true
+          wget -k https://github.com/fwup-home/fwup/releases/download/v1.9.0/fwup_1.9.0_amd64.deb -O fwup_1.9.0_amd64.deb
+          sudo dpkg -i fwup_1.9.0_amd64.deb
 
-          run: |
-            export PATH="/usr/local/bin:$(pwd)/Precompiled/bin:${PATH}"
-            echo "test ok"
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Make a nerves project
+        run: |
+          export PATH="/usr/local/bin:$(pwd)/Precompiled/bin:${PATH}"
+          mix nerves.new "${NERVES_PROJ_NAME}"
+          cd "${NERVES_PROJ_NAME}"
+          LINE="$(grep -n 'toolshed' mix.exs | awk -F: '{print $1+1}')"
+          head -n "${LINE}" mix.exs > mix.exs.tmp
+          echo '      {:image_rs, "~> 0.1.0-dev", github: "cocoa-xu/image_rs", branch: "main"},' >> mix.exs.tmp
+          tail -n "+${LINE}" mix.exs >> mix.exs.tmp
+          mv mix.exs.tmp mix.exs
+          export MIX_TARGET=${{ matrix.target }}
+          mix deps.get
+          mix deps.compile
+          mix firmware
+          mkdir -p "/tmp/firmware"
+          cp "./_build/${MIX_TARGET}_${MIX_ENV}/nerves/images/${NERVES_PROJ_NAME}.fw" "/tmp/firmware/${NERVES_PROJ_NAME}_${{ matrix.target }}_${MIX_ENV}.fw"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v2.2.4
+        with:
+          name: ${{ env.NERVES_PROJ_NAME }}_${{ matrix.target }}_${{ env.MIX_ENV }}.fw
+          path: /tmp/firmware/${{ env.NERVES_PROJ_NAME }}_${{ matrix.target }}_${{ env.MIX_ENV }}.fw
