@@ -49,6 +49,9 @@ jobs:
 
       - name: Make a nerves project
         run: |
+          rustup target add arm-unknown-linux-gnueabihf
+          rustup target add armv7-unknown-linux-gnueabihf
+          rustup target add aarch64-unknown-linux-gnu
           export PATH="/usr/local/bin:$(pwd)/Precompiled/bin:${PATH}"
           mix nerves.new "${NERVES_PROJ_NAME}"
           cd "${NERVES_PROJ_NAME}"
