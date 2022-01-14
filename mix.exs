@@ -6,11 +6,12 @@ defmodule ImgDecode.MixProject do
   @nerves_rust_target_triple_mapping %{
     "armv6-nerves-linux-gnueabihf": "arm-unknown-linux-gnueabihf",
     "armv7-nerves-linux-gnueabihf": "armv7-unknown-linux-gnueabihf",
-    aarch64_nerves_linux_gnu: "aarch64-unknown-linux-gnu",
-    x86_64_nerves_linux_musl: "x86_64-unknown-linux-musl"
+    "aarch64-nerves-linux-gnu": "aarch64-unknown-linux-gnu",
+    "x86_64-nerves-linux-musl": "x86_64-unknown-linux-musl"
   }
 
   def project do
+    IO.puts("NERVES_SDK_SYSROOT: #{System.get_env("NERVES_SDK_SYSROOT")}")
     if is_binary(System.get_env("NERVES_SDK_SYSROOT")) do
       components = System.get_env("CC")
         |> tap(&System.put_env("RUSTFLAGS", "-C linker=#{&1}"))
