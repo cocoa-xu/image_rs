@@ -63,7 +63,7 @@ jobs:
           export BRANCH_NAME=${{ steps.extract_branch.outputs.branch }}
           LINE="$(grep -n 'toolshed' mix.exs | awk -F: '{print $1+1}')"
           head -n "${LINE}" mix.exs > mix.exs.tmp
-          echo "      \{:image_rs, \"~> 0.1.0-dev\", github: \"cocoa-xu/image_rs\", branch: \"${BRANCH_NAME}\"}," >> mix.exs.tmp
+          echo "      {:image_rs, \"~> 0.1.0-dev\", github: \"cocoa-xu/image_rs\", branch: \"${BRANCH_NAME}\"}," >> mix.exs.tmp
           tail -n "+${LINE}" mix.exs >> mix.exs.tmp
           mv mix.exs.tmp mix.exs
           export MIX_TARGET=${{ matrix.target }}
