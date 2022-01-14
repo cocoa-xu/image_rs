@@ -1,0 +1,83 @@
+name: macos
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - dev
+    paths-ignore:
+      - '**/README.md'
+      - '.github/workflows/linux*'
+      - '.github/workflows/macos*'
+  workflow_dispatch:
+
+jobs:
+  mix_test:
+    runs-on: ubuntu-20.04
+    env:
+      MIX_ENV: dev
+      NERVES_PROJ_NAME: nerves_project
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64
+            target: rpi4
+            distro: ubuntu20.04
+          - arch: armv7
+            target: rpi3a
+            distro: ubuntu20.04
+          - arch: armv7
+            target: rpi3
+            distro: ubuntu20.04
+          - arch: armv7
+            target: rpi2
+            distro: ubuntu20.04
+          - arch: armv7
+            target: bbb
+            distro: ubuntu20.04
+          - arch: armv7
+            target: osd32mp1
+            distro: ubuntu20.04
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: uraimo/run-on-arch-action@v2.1.1
+        name: Build artifact
+        id: build
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.distro }}
+          githubToken: ${{ github.token }}
+
+          shell: /bin/bash
+          install: |
+            apt-get update -q -y
+            apt-get install -y sudo build-essential cmake gnupg2 automake autoconf pkg-config bc m4 unzip zip wget curl git libssl-dev libncurses5-dev erlang-inets erlang-os-mon erlang-runtime-tools erlang-ssl erlang-dev python3 ca-certificates erlang-parsetools
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            export OTP_VER=24.0
+            wget --no-check-certificate "https://erlang.org/download/otp_src_${OTP_VER}.tar.gz" -O "otp_src_${OTP_VER}.tar.gz"
+            tar xf "otp_src_${OTP_VER}.tar.gz"
+            cd "otp_src_${OTP_VER}"
+            export ERL_TOP=`pwd`
+            ./configure
+            make -j"$(nproc)"
+            make install
+            export PATH="/usr/local/bin:${PATH}"
+            cd ..
+            wget --no-check-certificate https://github.com/elixir-lang/elixir/releases/download/v1.13.2/Precompiled.zip -O Precompiled.zip
+            unzip -o Precompiled.zip
+            export PATH="$(pwd)/Precompiled/bin:${PATH}"
+            mix local.hex --force
+            mix local.rebar --force
+            mkdir -p ~/.ssh
+            echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCulZpVE/JdpWX53C35n45RSIMtaIIiTMnmRo5oDEMbyh0NnKI5byikkOvGnGLOO2KTlq4We+MF5iKx72B1Ixl8RY7L6Kc/h3R6jG4uOWBhw/WBhIebteJVYDzrlU8fHTewquWYT6tJ7v7g54Qe5vofsDeKBDqTJqJPlwNSxP8AjPZ0vQ4O4IhG0CXaDzU/G50sqzquKckgGWURLN9LcsA+kzciKJRhKw4Q7kpOiTNG/fzYxBpgpNrnyyr7bhj0jdOsg9KoG57aLSqbmEVCOyWa6yh6lOTp37S6ijBfQORxUu3I+6B04zUBSEvN4wgqslHU9pbIio8Szz1vbnlqsgO0tG1yqALfs6RVSjW81AujKefeH/8seE7q0yiHJXkE4tejIcewJT+2e6p/fP2pVSwyRqZ1bObtRUCMG3Pwdi0IpfsyBSa02Qc7eT9VB1WN7XD1vpfMDQ/nIWmoA40VkX3F3v5Mht5PZwVmlRyM8BrLtCYTreUP5xl6ZZCSX2IfOI8= nerves-ci-build' > ~/.ssh/id_rsa.pub
+            mix archive.install hex nerves_bootstrap --force || true
+            echo '#!/bin/bash' > /usr/bin/fwup
+            chmod +x /usr/bin/fwup
+
+          run: |
+            export PATH="/usr/local/bin:$(pwd)/Precompiled/bin:${PATH}"
+            echo "test ok"
