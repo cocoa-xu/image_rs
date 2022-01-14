@@ -11,7 +11,6 @@ defmodule ImgDecode.MixProject do
   }
 
   def project do
-    IO.puts("NERVES_SDK_SYSROOT: #{System.get_env("NERVES_SDK_SYSROOT")}")
     if is_binary(System.get_env("NERVES_SDK_SYSROOT")) do
       components = System.get_env("CC")
         |> tap(&System.put_env("RUSTFLAGS", "-C linker=#{&1}"))
