@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - '**/README.md'
       - '.github/workflows/linux*'
+      - '.github/workflows/nerves*'
   workflow_dispatch:
 
 jobs:
