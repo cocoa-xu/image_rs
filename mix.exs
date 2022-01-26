@@ -52,7 +52,7 @@ defmodule ImgDecode.MixProject do
 
   defp deps do
     [
-      {:rustler, "~> 0.23.0", github: "cocoa-xu/rustler", sparse: "rustler_mix", branch: "cross-compile"},
+      {:rustler, "~> 0.23.0", github: "rusterlium/rustler", sparse: "rustler_mix", branch: "main"},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false}
     ]
   end

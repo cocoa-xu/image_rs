@@ -22,19 +22,20 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        target: [ rpi4, rpi3a, rpi3, rpi2, rpi0, rpi, bbb, osd32mp1 ]
+        target: [ rpi4, rpi3a, rpi3, rpi2, rpi0, rpi, bbb, osd32mp1, npi_imx6ull ]
 
     steps:
+      - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "24.1.5"
-          elixir-version: "1.12.3"
+          otp-version: "24.2"
+          elixir-version: "1.13.2"
 
       - name: Install nerves and system dependecies
         run: |
           mkdir -p ~/.ssh
           echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCulZpVE/JdpWX53C35n45RSIMtaIIiTMnmRo5oDEMbyh0NnKI5byikkOvGnGLOO2KTlq4We+MF5iKx72B1Ixl8RY7L6Kc/h3R6jG4uOWBhw/WBhIebteJVYDzrlU8fHTewquWYT6tJ7v7g54Qe5vofsDeKBDqTJqJPlwNSxP8AjPZ0vQ4O4IhG0CXaDzU/G50sqzquKckgGWURLN9LcsA+kzciKJRhKw4Q7kpOiTNG/fzYxBpgpNrnyyr7bhj0jdOsg9KoG57aLSqbmEVCOyWa6yh6lOTp37S6ijBfQORxUu3I+6B04zUBSEvN4wgqslHU9pbIio8Szz1vbnlqsgO0tG1yqALfs6RVSjW81AujKefeH/8seE7q0yiHJXkE4tejIcewJT+2e6p/fP2pVSwyRqZ1bObtRUCMG3Pwdi0IpfsyBSa02Qc7eT9VB1WN7XD1vpfMDQ/nIWmoA40VkX3F3v5Mht5PZwVmlRyM8BrLtCYTreUP5xl6ZZCSX2IfOI8= nerves-ci-build' > ~/.ssh/id_rsa.pub
-          sudo apt-get update && sudo apt-get install -y build-essential automake autoconf pkg-config bc m4 unzip zip curl git libssl-dev libncurses5-dev erlang-inets erlang-os-mon erlang-runtime-tools erlang-ssl erlang-dev python3 ca-certificates squashfs-tools ssh-askpass
+          sudo apt-get update && sudo apt-get install -y build-essential automake autoconf pkg-config bc m4 unzip zip curl git libssl-dev libncurses5-dev ca-certificates squashfs-tools ssh-askpass
           mix local.hex --force
           mix local.rebar --force
           mix archive.install hex nerves_bootstrap --force || true
@@ -47,27 +48,22 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Extract branch name
-        shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
-        id: extract_branch
-
       - name: Make a nerves project
         run: |
           rustup target add arm-unknown-linux-gnueabihf
           rustup target add armv7-unknown-linux-gnueabihf
           rustup target add aarch64-unknown-linux-gnu
           export PATH="/usr/local/bin:$(pwd)/Precompiled/bin:${PATH}"
+          cd ..
           mix nerves.new "${NERVES_PROJ_NAME}"
           cd "${NERVES_PROJ_NAME}"
-          export BRANCH_NAME=${{ steps.extract_branch.outputs.branch }}
           LINE="$(grep -n 'toolshed' mix.exs | awk -F: '{print $1+1}')"
           head -n "${LINE}" mix.exs > mix.exs.tmp
-          echo "      {:image_rs, \"~> 0.1.0-dev\", github: \"cocoa-xu/image_rs\", branch: \"${BRANCH_NAME}\"}," >> mix.exs.tmp
+          echo -e '\n      {:image_rs, "~> 0.1.0-dev", path: "../image_rs"},' >> mix.exs.tmp
           tail -n "+${LINE}" mix.exs >> mix.exs.tmp
           mv mix.exs.tmp mix.exs
           export MIX_TARGET=${{ matrix.target }}
-          mix deps.get
+          mix deps.get 1>/dev/null 2>&1
           mix deps.compile
           mix firmware
           mkdir -p "/tmp/firmware"
