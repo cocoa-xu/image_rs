@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        target: [ rpi4, rpi3a, rpi3, rpi2, rpi0, rpi, bbb, osd32mp1, npi_imx6ull ]
+        target: [ rpi4, rpi3a, rpi3, rpi2, rpi0, rpi, bbb, osd32mp1 ]
 
     steps:
       - uses: actions/checkout@v2
@@ -64,7 +64,6 @@ jobs:
           mv mix.exs.tmp mix.exs
           export MIX_TARGET=${{ matrix.target }}
           mix deps.get 1>/dev/null 2>&1
-          mix deps.compile
           mix firmware
           mkdir -p "/tmp/firmware"
           cp "./_build/${MIX_TARGET}_${MIX_ENV}/nerves/images/${NERVES_PROJ_NAME}.fw" "/tmp/firmware/${NERVES_PROJ_NAME}_${{ matrix.target }}_${MIX_ENV}.fw"
