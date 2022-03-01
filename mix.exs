@@ -52,7 +52,7 @@ defmodule ImgDecode.MixProject do
 
   defp deps do
     [
-      {:rustler, "~> 0.23.0", github: "rusterlium/rustler", sparse: "rustler_mix", branch: "master"},
+      {:rustler, "~> 0.24.0", github: "rusterlium/rustler", sparse: "rustler_mix", branch: "master"},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false}
     ]
   end
