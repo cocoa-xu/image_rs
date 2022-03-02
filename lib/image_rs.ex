@@ -21,7 +21,7 @@ defmodule ImageRs do
 
       {:ok, result} ->
         {img, shape, type, channels} = result
-        {:ok, IO.iodata_to_binary(img), shape, String.to_atom(type), String.to_atom(channels)}
+        {:ok, img, shape, String.to_atom(type), String.to_atom(channels)}
     end
   end
 
@@ -46,7 +46,7 @@ defmodule ImageRs do
 
       {:ok, result} ->
         {img, shape, type, channels} = result
-        {:ok, IO.iodata_to_binary(img), shape, String.to_atom(type), String.to_atom(channels)}
+        {:ok, img, shape, String.to_atom(type), String.to_atom(channels)}
     end
   end
 end
