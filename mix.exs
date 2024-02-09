@@ -1,7 +1,10 @@
 defmodule ImgDecode.MixProject do
   use Mix.Project
 
+  @version "0.2.0"
   @github_url "https://github.com/cocoa-xu/image_rs"
+  @dev? String.ends_with?(@version, "-dev")
+  @force_build? System.get_env("IMAGE_RS_BUILD") in ["1", "true"]
 
   @nerves_rust_target_triple_mapping %{
     "armv6-nerves-linux-gnueabihf": "arm-unknown-linux-gnueabihf",
@@ -30,13 +33,18 @@ defmodule ImgDecode.MixProject do
 
     [
       app: :image_rs,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       description: description(),
       package: package(),
       deps: deps(),
-      source_url: @github_url
+      source_url: @github_url,
+      aliases: [
+        "rust.lint": ["cmd cargo clippy --manifest-path=native/image_rs_nif/Cargo.toml -- -Dwarnings"],
+        "rust.fmt": ["cmd cargo fmt --manifest-path=native/image_rs_nif/Cargo.toml --all"],
+        ci: ["format", "rust.fmt", "rust.lint", "test"]
+      ]
     ]
   end
 
@@ -52,7 +60,9 @@ defmodule ImgDecode.MixProject do
 
   defp deps do
     [
-      {:rustler, "~> 0.24.0"},
+      {:castore, "~> 1.0"},
+      {:rustler, "~> 0.29.0", optional: not (@dev? or @force_build?)},
+      {:rustler_precompiled, "~> 0.7"},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false}
     ]
   end
@@ -60,7 +70,13 @@ defmodule ImgDecode.MixProject do
   defp package() do
     [
       name: "image_rs",
-      files: ~w(native lib .formatter.exs mix.exs),
+      files: ~w(
+        lib
+        native
+        checksum-*.exs,
+        mix.exs
+        README.md,
+        LICENSE),
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => @github_url}
     ]

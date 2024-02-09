@@ -2,7 +2,7 @@
 name = "image_rs_nif"
 version = "0.1.0"
 authors = []
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "image_rs_nif"
@@ -10,5 +10,11 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-rustler = "0.24.0"
+rustler = "0.29.0"
 image = "0"
+
+[features]
+default = ["nif_version_2_15"]
+
+# Feature necessary for Rustler Precompiled.
+nif_version_2_15 = ["rustler/nif_version_2_15"]
