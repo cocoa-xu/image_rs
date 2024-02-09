@@ -18,6 +18,7 @@ jobs:
     env:
       MIX_ENV: test
       ELIXIR_VERSION: "1.16.0"
+      IMAGE_RS_BUILD: "true"
     strategy:
       matrix:
         otp_version: ["25.3.2.8", "26.2.2"]

@@ -18,6 +18,7 @@ jobs:
     env:
       MIX_ENV: dev
       NERVES_PROJ_NAME: nerves_project
+      IMAGE_RS_BUILD: "true"
 
     strategy:
       fail-fast: true
