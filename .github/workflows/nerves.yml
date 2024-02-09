@@ -14,7 +14,7 @@ on:
 
 jobs:
   mix_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       MIX_ENV: dev
       NERVES_PROJ_NAME: nerves_project
@@ -22,14 +22,14 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        target: [ rpi4, rpi3a, rpi3, rpi2, rpi0, rpi, bbb, osd32mp1 ]
+        target: [ rpi5, rpi4, rpi3a, rpi3, rpi2, rpi0, rpi, bbb, osd32mp1 ]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "24.2"
-          elixir-version: "1.13.2"
+          otp-version: "26.2"
+          elixir-version: "1.16"
 
       - name: Install nerves and system dependecies
         run: |
@@ -59,7 +59,7 @@ jobs:
           cd "${NERVES_PROJ_NAME}"
           LINE="$(grep -n 'toolshed' mix.exs | awk -F: '{print $1+1}')"
           head -n "${LINE}" mix.exs > mix.exs.tmp
-          echo -e '\n      {:image_rs, "~> 0.1.0-dev", path: "../image_rs"},' >> mix.exs.tmp
+          echo -e '\n      {:image_rs, "~> 0.2.0-dev", path: "../image_rs"},' >> mix.exs.tmp
           tail -n "+${LINE}" mix.exs >> mix.exs.tmp
           mv mix.exs.tmp mix.exs
           export MIX_TARGET=${{ matrix.target }}
