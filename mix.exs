@@ -9,13 +9,13 @@ defmodule ImgDecode.MixProject do
   @nerves_rust_target_triple_mapping %{
     "armv6-nerves-linux-gnueabihf": "arm-unknown-linux-gnueabihf",
     "armv7-nerves-linux-gnueabihf": "armv7-unknown-linux-gnueabihf",
-    "aarch64-nerves-linux-gnu": "aarch64-unknown-linux-gnu",
-    "x86_64-nerves-linux-musl": "x86_64-unknown-linux-musl"
+    "aarch64-nerves-linux-gnu": "aarch64-unknown-linux-gnu"
   }
 
   def project do
     if is_binary(System.get_env("NERVES_SDK_SYSROOT")) do
-      components = System.get_env("CC")
+      components =
+        System.get_env("CC")
         |> tap(&System.put_env("RUSTFLAGS", "-C linker=#{&1}"))
         |> Path.basename()
         |> String.split("-")
@@ -26,6 +26,7 @@ defmodule ImgDecode.MixProject do
         |> Enum.join("-")
 
       mapping = Map.get(@nerves_rust_target_triple_mapping, String.to_atom(target_triple))
+
       if is_binary(mapping) do
         System.put_env("RUSTLER_TARGET", mapping)
       end
