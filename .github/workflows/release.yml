@@ -75,7 +75,7 @@ jobs:
         id: build-crate
         uses: philss/rustler-precompiled-action@v1.1.3
         with:
-          project-name: explorer
+          project-name: image_rs_nif
           project-version: ${{ env.PROJECT_VERSION }}
           target: ${{ matrix.job.target }}
           nif-version: ${{ matrix.nif }}
