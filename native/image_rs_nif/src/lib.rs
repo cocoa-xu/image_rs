@@ -2,7 +2,7 @@ use std::result::Result;
 use std::io::Write;
 use image;
 use std::vec::Vec;
-use image::{ColorType, GenericImageView};
+use image::ColorType;
 use rustler::Env;
 use rustler::types::binary::{Binary, NewBinary};
 
@@ -24,8 +24,8 @@ fn _get_image<'a>(env: Env<'a>, img: &image::DynamicImage) -> ElixirImageResultT
         ColorType::La16 => (2, "la", "u16"),
         ColorType::Rgb16 => (3, "rgb", "u16"),
         ColorType::Rgba16 => (4, "rgba", "u16"),
-        ColorType::Bgr8 => (3, "bgr", "u8"),
-        ColorType::Bgra8 => (4, "bgra", "u8"),
+        ColorType::Rgb32F => (3, "rgb", "f32"),
+        ColorType::Rgba32F => (4, "rgba", "f32"),
         _ => (0, "unknown", "unknown")
     };
     let width = img.width();
