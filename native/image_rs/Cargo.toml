@@ -1,11 +1,11 @@
 [package]
-name = "image_rs_nif"
+name = "image_rs"
 version = "0.1.0"
 authors = []
 edition = "2021"
 
 [lib]
-name = "image_rs_nif"
+name = "image_rs"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

@@ -1,17 +1,17 @@
-use std::result::Result;
-use std::io::Write;
 use image;
-use std::vec::Vec;
 use image::ColorType;
-use rustler::Env;
 use rustler::types::binary::{Binary, NewBinary};
+use rustler::Env;
+use std::io::Write;
+use std::result::Result;
+use std::vec::Vec;
 
 type ElixirImageResultTuple<'a> = (Binary<'a>, (u32, u32, u32), &'static str, &'static str);
 
 fn _get_binary<'a>(env: Env<'a>, image: &[u8]) -> NewBinary<'a> {
-  let mut binary = NewBinary::new(env, image.len());
-  binary.as_mut_slice().write_all(image).unwrap();
-  binary
+    let mut binary = NewBinary::new(env, image.len());
+    binary.as_mut_slice().write_all(image).unwrap();
+    binary
 }
 
 fn _get_image<'a>(env: Env<'a>, img: &image::DynamicImage) -> ElixirImageResultTuple<'a> {
@@ -26,7 +26,7 @@ fn _get_image<'a>(env: Env<'a>, img: &image::DynamicImage) -> ElixirImageResultT
         ColorType::Rgba16 => (4, "rgba", "u16"),
         ColorType::Rgb32F => (3, "rgb", "f32"),
         ColorType::Rgba32F => (4, "rgba", "f32"),
-        _ => (0, "unknown", "unknown")
+        _ => (0, "unknown", "unknown"),
     };
     let width = img.width();
     let height = img.height();
@@ -45,7 +45,10 @@ fn from_file<'a>(env: Env<'a>, filename: &str) -> Result<ElixirImageResultTuple<
 }
 
 #[rustler::nif]
-fn from_memory<'a>(env: Env<'a>, buffer: Binary) -> Result<ElixirImageResultTuple<'a>, &'static str> {
+fn from_memory<'a>(
+    env: Env<'a>,
+    buffer: Binary,
+) -> Result<ElixirImageResultTuple<'a>, &'static str> {
     if let Ok(img) = image::load_from_memory(buffer.as_slice()) {
         Ok(_get_image(env, &img))
     } else {

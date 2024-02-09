@@ -41,8 +41,8 @@ defmodule ImgDecode.MixProject do
       deps: deps(),
       source_url: @github_url,
       aliases: [
-        "rust.lint": ["cmd cargo clippy --manifest-path=native/image_rs_nif/Cargo.toml -- -Dwarnings"],
-        "rust.fmt": ["cmd cargo fmt --manifest-path=native/image_rs_nif/Cargo.toml --all"],
+        "rust.lint": ["cmd cargo clippy --manifest-path=native/image_rs/Cargo.toml -- -Dwarnings"],
+        "rust.fmt": ["cmd cargo fmt --manifest-path=native/image_rs/Cargo.toml --all"],
         ci: ["format", "rust.fmt", "rust.lint", "test"]
       ]
     ]
@@ -73,9 +73,9 @@ defmodule ImgDecode.MixProject do
       files: ~w(
         lib
         native
-        checksum-*.exs,
+        checksum-*.exs
         mix.exs
-        README.md,
+        README.md
         LICENSE),
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => @github_url}
