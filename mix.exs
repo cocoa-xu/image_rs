@@ -61,10 +61,10 @@ defmodule ImgDecode.MixProject do
 
   defp deps do
     [
-      {:castore, "~> 1.0"},
+      {:castore, "~> 1.0 or ~> 0.1"},
       {:rustler, "~> 0.30.0", optional: not (@dev? or @force_build?)},
       {:rustler_precompiled, "~> 0.7"},
-      {:ex_doc, "~> 0.23", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.29", only: :docs, runtime: false}
     ]
   end
 
