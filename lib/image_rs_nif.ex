@@ -54,5 +54,31 @@ defmodule ImageRs.Nif do
     force_build: System.get_env("IMAGE_RS_BUILD") in ["1", "true"]
 
   def from_file(_filename), do: :erlang.nif_error(:not_loaded)
-  def from_memory(_buffer), do: :erlang.nif_error(:not_loaded)
+  def from_binary(_data), do: :erlang.nif_error(:not_loaded)
+  @spec to_binary(any()) :: any()
+  def to_binary(_image), do: :erlang.nif_error(:not_loaded)
+  def resize(_image, _height, _width, _filter_type), do: :erlang.nif_error(:not_loaded)
+
+  def resize_preserve_ratio(_image, _height, _width, _filter_type),
+    do: :erlang.nif_error(:not_loaded)
+
+  def resize_to_fill(_image, _height, _width, _filter_type), do: :erlang.nif_error(:not_loaded)
+
+  def crop(_image, _x, _y, _height, _width), do: :erlang.nif_error(:not_loaded)
+  def grayscale(_image), do: :erlang.nif_error(:not_loaded)
+  def invert(_image), do: :erlang.nif_error(:not_loaded)
+  def blur(_image, _sigma), do: :erlang.nif_error(:not_loaded)
+  def unsharpen(_image, _sigma, _threshold), do: :erlang.nif_error(:not_loaded)
+  def filter3x3(_image, _kernel), do: :erlang.nif_error(:not_loaded)
+  def adjust_contrast(_image, _contrast), do: :erlang.nif_error(:not_loaded)
+  def brighten(_image, _value), do: :erlang.nif_error(:not_loaded)
+  def huerotate(_image, _value), do: :erlang.nif_error(:not_loaded)
+  def flipv(_image), do: :erlang.nif_error(:not_loaded)
+  def fliph(_image), do: :erlang.nif_error(:not_loaded)
+  def rotate90(_image), do: :erlang.nif_error(:not_loaded)
+  def rotate180(_image), do: :erlang.nif_error(:not_loaded)
+  def rotate270(_image), do: :erlang.nif_error(:not_loaded)
+  def encode_as(_image, _format, _options), do: :erlang.nif_error(:not_loaded)
+  def save(_image, _path), do: :erlang.nif_error(:not_loaded)
+  def save_with_format(_image, _path, _format), do: :erlang.nif_error(:not_loaded)
 end

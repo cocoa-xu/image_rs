@@ -1,59 +1,60 @@
-use image;
-use image::ColorType;
-use rustler::types::binary::{Binary, NewBinary};
-use rustler::Env;
-use std::io::Write;
-use std::result::Result;
-use std::vec::Vec;
+use rustler::{Env, Term};
 
-type ElixirImageResultTuple<'a> = (Binary<'a>, (u32, u32, u32), &'static str, &'static str);
+mod datatypes;
+mod error;
+mod image_rs;
 
-fn _get_binary<'a>(env: Env<'a>, image: &[u8]) -> NewBinary<'a> {
-    let mut binary = NewBinary::new(env, image.len());
-    binary.as_mut_slice().write_all(image).unwrap();
-    binary
+pub use datatypes::{
+    ImageRsColorType, ImageRsDataType, ImageRsDynamicImage, ImageRsDynamicImageRef,
+    ImageRsFilterType, ImageRsOutputFormat,
+};
+pub use error::ImageRsError;
+pub use image_rs::*;
+
+fn on_load(env: Env, _info: Term) -> bool {
+    rustler::resource!(ImageRsDynamicImageRef, env);
+    true
 }
 
-fn _get_image<'a>(env: Env<'a>, img: &image::DynamicImage) -> ElixirImageResultTuple<'a> {
-    let (channels, color, pix_fmt) = match img.color() {
-        ColorType::L8 => (1, "l", "u8"),
-        ColorType::La8 => (2, "la", "u8"),
-        ColorType::Rgb8 => (3, "rgb", "u8"),
-        ColorType::Rgba8 => (4, "rgba", "u8"),
-        ColorType::L16 => (1, "l", "u16"),
-        ColorType::La16 => (2, "la", "u16"),
-        ColorType::Rgb16 => (3, "rgb", "u16"),
-        ColorType::Rgba16 => (4, "rgba", "u16"),
-        ColorType::Rgb32F => (3, "rgb", "f32"),
-        ColorType::Rgba32F => (4, "rgba", "f32"),
-        _ => (0, "unknown", "unknown"),
-    };
-    let width = img.width();
-    let height = img.height();
-    let slice = img.as_bytes();
-    let b = Binary::from(_get_binary(env, slice));
-    (b, (height, width, channels), pix_fmt, color)
-}
-
-#[rustler::nif]
-fn from_file<'a>(env: Env<'a>, filename: &str) -> Result<ElixirImageResultTuple<'a>, &'static str> {
-    if let Ok(img) = image::open(filename) {
-        Ok(_get_image(env, &img))
-    } else {
-        Err("cannot decode image")
+mod atoms {
+    rustler::atoms! {
+        l8,
+        la8,
+        rgb,
+        rgba,
+        u8,
+        u16,
+        f32,
+        unknown,
     }
 }
 
-#[rustler::nif]
-fn from_memory<'a>(
-    env: Env<'a>,
-    buffer: Binary,
-) -> Result<ElixirImageResultTuple<'a>, &'static str> {
-    if let Ok(img) = image::load_from_memory(buffer.as_slice()) {
-        Ok(_get_image(env, &img))
-    } else {
-        Err("cannot decode image")
-    }
-}
-
-rustler::init!("Elixir.ImageRs.Nif", [from_file, from_memory]);
+rustler::init!(
+    "Elixir.ImageRs.Nif",
+    [
+        from_file,
+        from_binary,
+        to_binary,
+        resize,
+        resize_preserve_ratio,
+        resize_to_fill,
+        crop,
+        grayscale,
+        invert,
+        blur,
+        unsharpen,
+        filter3x3,
+        adjust_contrast,
+        brighten,
+        huerotate,
+        flipv,
+        fliph,
+        rotate90,
+        rotate180,
+        rotate270,
+        encode_as,
+        save,
+        save_with_format
+    ],
+    load = on_load
+);
