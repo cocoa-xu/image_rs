@@ -10,11 +10,48 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-rustler = "0.30.0"
+anyhow = "1"
 image = "0"
+rustler = "0.30.0"
+thiserror = "1"
 
 [features]
-default = ["nif_version_2_15"]
+default = [
+    "nif_version_2_15",
+    "gif",
+    "jpeg",
+    "ico",
+    "png",
+    "pnm",
+    "tga",
+    "tiff",
+    "webp",
+    "bmp",
+    "hdr",
+    "dxt",
+    "dds",
+    "farbfeld",
+    "jpeg_rayon",
+    "openexr",
+    "qoi",
+]
+avif = ["image/avif"]
+dxt = ["image/dxt"]
+dds = ["image/dxt"]
+farbfeld = ["image/farbfeld"]
+hdr = ["image/hdr"]
+ico = ["image/ico"]
+jpeg_rayon = ["image/jpeg_rayon"]
+openexr = ["image/openexr"]
+pnm = ["image/pnm"]
+qoi = ["image/qoi"]
+tga = ["image/tga"]
+webp = ["image/webp"]
+gif = ["image/gif"]
+jpeg = ["image/jpeg"]
+png = ["image/png"]
+tiff = ["image/tiff"]
+bmp = ["image/bmp"]
 
 # Feature necessary for Rustler Precompiled.
 nif_version_2_15 = ["rustler/nif_version_2_15"]
