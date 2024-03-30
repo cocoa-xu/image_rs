@@ -5,7 +5,7 @@ use crate::{
 use image::{ColorType, DynamicImage, ImageBuffer, ImageOutputFormat};
 use rustler::{Binary, Env, NewBinary};
 use std::collections::HashMap;
-use std::io::{BufWriter, Cursor, Write};
+use std::io::{BufWriter, Cursor, Seek, Write};
 use std::result::Result;
 use std::result::Result::Ok;
 use std::vec::Vec;
@@ -297,12 +297,14 @@ fn encode_as<'a>(
 ) -> Result<Binary<'a>, ImageRsError> {
     let c = Cursor::new(Vec::new());
     let mut buffer = BufWriter::new(c);
-    let output_format = into_output_format(format, &options)?;
-    image.write_to(&mut buffer, output_format)?;
+    into_output_format(&mut buffer, &image, format, &options)?;
 
-    let buf = buffer.buffer();
-    let mut binary = NewBinary::new(env, buf.len());
-    binary.as_mut_slice().write_all(buf)?;
+    buffer.seek(std::io::SeekFrom::Start(0))?;
+    let cursor = buffer.get_ref();
+    let bytes = cursor.get_ref();
+
+    let mut binary = NewBinary::new(env, bytes.len());
+    binary.as_mut_slice().write_all(bytes)?;
     Ok(Binary::from(binary))
 }
 
@@ -341,18 +343,31 @@ pub fn get_image_detail(
     ((height, width, channels), color, datatype)
 }
 
-fn into_output_format(
+use image::codecs::*;
+use image::ImageEncoder;
+
+fn into_output_format<W: std::io::Write + Seek>(
+    buffered_write: &mut W,
+    image: &ImageRsDynamicImage,
     format: ImageRsOutputFormat,
     options: &HashMap<String, String>,
-) -> Result<ImageOutputFormat, ImageRsError> {
+) -> Result<(), ImageRsError> {
+    let ((height, width, _channels), _color, _dtype) = get_image_detail(&image);
+    let buf = image.as_bytes();
+    let color = image.color();
     match format {
         #[cfg(feature = "png")]
-        ImageRsOutputFormat::Png => Ok(ImageOutputFormat::Png),
+        ImageRsOutputFormat::Png => {
+            png::PngEncoder::new(buffered_write).write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "jpeg")]
         ImageRsOutputFormat::Jpeg => {
             if let Some(quality_string) = options.get("quality") {
                 if let Ok(q) = quality_string.parse::<u8>() {
-                    Ok(ImageOutputFormat::Jpeg(q))
+                    jpeg::JpegEncoder::new_with_quality(buffered_write, q)
+                        .write_image(buf, width, height, color)?;
+                    Ok(())
                 } else {
                     Err(ImageRsError::Other("bad argument".to_string()))
                 }
@@ -362,7 +377,7 @@ fn into_output_format(
         }
         #[cfg(feature = "pnm")]
         ImageRsOutputFormat::Pnm => {
-            if let Some(subtype) = options.get("subtype") {
+            let format = if let Some(subtype) = options.get("subtype") {
                 if ["bitmap", "graymap", "pixmap", "arbitrarymap"].contains(&&subtype[..]) {
                     if subtype == "arbitrarymap" {
                         Ok(ImageOutputFormat::Pnm(
@@ -401,28 +416,68 @@ fn into_output_format(
                 }
             } else {
                 Err(ImageRsError::Other("bad argument".to_string()))
+            };
+            if let Ok(ImageOutputFormat::Pnm(subtype)) = format {
+                pnm::PnmEncoder::new(buffered_write)
+                    .with_subtype(subtype)
+                    .write_image(buf, width, height, color)?;
+                Ok(())
+            } else {
+                Err(ImageRsError::Other("bad argument".to_string()))
             }
         }
         #[cfg(feature = "gif")]
-        ImageRsOutputFormat::Gif => Ok(ImageOutputFormat::Gif),
+        ImageRsOutputFormat::Gif => {
+            gif::GifEncoder::new(buffered_write).encode(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "ico")]
-        ImageRsOutputFormat::Ico => Ok(ImageOutputFormat::Ico),
+        ImageRsOutputFormat::Ico => {
+            ico::IcoEncoder::new(buffered_write).write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "bmp")]
-        ImageRsOutputFormat::Bmp => Ok(ImageOutputFormat::Bmp),
+        ImageRsOutputFormat::Bmp => {
+            bmp::BmpEncoder::new(buffered_write).write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "farbfeld")]
-        ImageRsOutputFormat::Farbfeld => Ok(ImageOutputFormat::Farbfeld),
+        ImageRsOutputFormat::Farbfeld => {
+            farbfeld::FarbfeldEncoder::new(buffered_write)
+                .write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "tga")]
-        ImageRsOutputFormat::Tga => Ok(ImageOutputFormat::Tga),
+        ImageRsOutputFormat::Tga => {
+            tga::TgaEncoder::new(buffered_write).write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "exr")]
-        ImageRsOutputFormat::Exr => Ok(ImageOutputFormat::OpenExr),
+        ImageRsOutputFormat::Exr => {
+            openexr::OpenExrEncoder::new(buffered_write).write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "tiff")]
-        ImageRsOutputFormat::Tiff => Ok(ImageOutputFormat::Tiff),
+        ImageRsOutputFormat::Tiff => {
+            tiff::TiffEncoder::new(buffered_write).write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "avif")]
-        ImageRsOutputFormat::Avif => Ok(ImageOutputFormat::Avif),
+        ImageRsOutputFormat::Avif => {
+            avif::AvifEncoder::new(buffered_write).write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "qoi")]
-        ImageRsOutputFormat::Qoi => Ok(ImageOutputFormat::Qoi),
+        ImageRsOutputFormat::Qoi => {
+            qoi::QoiEncoder::new(buffered_write).write_image(buf, width, height, color)?;
+            Ok(())
+        }
         #[cfg(feature = "webp")]
-        ImageRsOutputFormat::Webp => Ok(ImageOutputFormat::WebP),
+        ImageRsOutputFormat::Webp => {
+            webp::WebPEncoder::new_lossless(buffered_write)
+                .write_image(buf, width, height, color)?;
+            Ok(())
+        }
         _ => Err(ImageRsError::Other("Unsupported format".to_string())),
     }
 }
