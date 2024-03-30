@@ -46,7 +46,7 @@ jobs:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04, variant: "legacy_cpu" }
 
     steps:
-      - name: Checkout source code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Extract crate information

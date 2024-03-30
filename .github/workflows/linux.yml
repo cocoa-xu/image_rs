@@ -24,7 +24,8 @@ jobs:
       IMAGE_RS_BUILD: "true"
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@v1
         with:
