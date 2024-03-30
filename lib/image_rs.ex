@@ -45,7 +45,7 @@ defmodule ImageRs do
 
   ## Example
   ```elixir
-  {:ok, image} = ImageRs.DynamicImage.from_file("/path/to/image")
+  {:ok, image} = ImageRs.from_file("/path/to/image")
   width = image.width
   height = image.height
   channels = image.channels
@@ -55,9 +55,22 @@ defmodule ImageRs do
   type = image.type
   ```
   """
-  @spec from_file(Path.t()) :: {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec from_file(Path.t()) :: {:ok, ImageRs.t()} | {:error, String.t()}
   def from_file(filename) do
     ImageRs.Nif.from_file(filename)
+  end
+
+  @doc """
+  Similar to from_file/1 but raises on errors
+  """
+  @spec from_file!(Path.t()) :: ImageRs.t()
+  def from_file!(filename) do
+    with {:ok, image} <- ImageRs.Nif.from_file(filename) do
+      image
+    else
+      {:error, msg} ->
+        raise RuntimeError, msg
+    end
   end
 
   @doc """
@@ -71,7 +84,7 @@ defmodule ImageRs do
   {:ok, data} = File.read("/path/to/image")
 
   # decode the image from memory
-  {:ok, image} = ImageRs.DynamicImage.from_binary(data)
+  {:ok, image} = ImageRs.from_binary(data)
   width = image.width
   height = image.height
   channels = image.channels
@@ -81,18 +94,37 @@ defmodule ImageRs do
   type = image.type
   ```
   """
-  @spec from_binary(binary()) :: {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec from_binary(binary()) :: {:ok, ImageRs.t()} | {:error, String.t()}
   def from_binary(data) when is_binary(data) do
     ImageRs.Nif.from_binary(data)
   end
 
+  @doc """
+  Similar to from_binary/1 but raises on errors
+  """
+  @spec from_binary!(binary()) :: ImageRs.t()
+  def from_binary!(data) when is_binary(data) do
+    with {:ok, image} <- ImageRs.Nif.from_binary(data) do
+      image
+    else
+      {:error, msg} ->
+        raise RuntimeError, msg
+    end
+  end
+
+  @doc """
+  Create a new `ImageRs` from given binary with corresponding parameters.
+  """
   @spec new(pos_integer(), pos_integer(), :l | :la | :rgb | :rgba, :u8 | :u16 | :f32, binary()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def new(height, width, color_type, dtype, data) do
     ImageRs.Nif.new(height, width, color_type, dtype, data)
   end
 
-  @spec to_binary(ImageRs.DynamicImage.t()) :: {:ok, binary()} | {:error, String.t()}
+  @doc """
+  Get binary representation of pixels.
+  """
+  @spec to_binary(ImageRs.t()) :: {:ok, binary()} | {:error, String.t()}
   def to_binary(image) do
     ImageRs.Nif.to_binary(image)
   end
@@ -105,11 +137,11 @@ defmodule ImageRs do
   `height` and `width` are the new image's dimensions.
   """
   @spec resize(
-          ImageRs.DynamicImage.t(),
+          ImageRs.t(),
           non_neg_integer(),
           non_neg_integer(),
           :nearest | :triangle | :catmull_rom | :gaussian | :lanczos3
-        ) :: {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+        ) :: {:ok, ImageRs.t()} | {:error, String.t()}
   def resize(image, height, width, filter_type \\ :lanczos3) do
     ImageRs.Nif.resize(image, height, width, filter_type)
   end
@@ -122,11 +154,11 @@ defmodule ImageRs do
   The image is scaled to the maximum possible size that fits within the bounds specified by `width` and `height`.
   """
   @spec resize_preserve_ratio(
-          ImageRs.DynamicImage.t(),
+          ImageRs.t(),
           non_neg_integer(),
           non_neg_integer(),
           :nearest | :triangle | :catmull_rom | :gaussian | :lanczos3
-        ) :: {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+        ) :: {:ok, ImageRs.t()} | {:error, String.t()}
   def resize_preserve_ratio(image, height, width, filter_type \\ :lanczos3) do
     ImageRs.Nif.resize_preserve_ratio(image, height, width, filter_type)
   end
@@ -141,11 +173,11 @@ defmodule ImageRs do
   then cropped to fit within the other bound.
   """
   @spec resize_to_fill(
-          ImageRs.DynamicImage.t(),
+          ImageRs.t(),
           non_neg_integer(),
           non_neg_integer(),
           :nearest | :triangle | :catmull_rom | :gaussian | :lanczos3
-        ) :: {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+        ) :: {:ok, ImageRs.t()} | {:error, String.t()}
   def resize_to_fill(image, height, width, filter_type \\ :lanczos3) do
     ImageRs.Nif.resize_to_fill(image, height, width, filter_type)
   end
@@ -154,12 +186,12 @@ defmodule ImageRs do
   Return a cut-out of this image delimited by the bounding rectangle.
   """
   @spec crop(
-          ImageRs.DynamicImage.t(),
+          ImageRs.t(),
           non_neg_integer(),
           non_neg_integer(),
           non_neg_integer(),
           non_neg_integer()
-        ) :: {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+        ) :: {:ok, ImageRs.t()} | {:error, String.t()}
   def crop(image, x, y, height, width) do
     ImageRs.Nif.crop(image, x, y, height, width)
   end
@@ -169,8 +201,8 @@ defmodule ImageRs do
 
   Returns Luma images in most cases. However, for f32 images, this will return a grayscale Rgb/Rgba image instead.
   """
-  @spec grayscale(ImageRs.DynamicImage.t()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec grayscale(ImageRs.t()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def grayscale(image) do
     ImageRs.Nif.grayscale(image)
   end
@@ -178,7 +210,7 @@ defmodule ImageRs do
   @doc """
   Invert the colors of this image.
   """
-  @spec invert(ImageRs.DynamicImage.t()) :: {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec invert(ImageRs.t()) :: {:ok, ImageRs.t()} | {:error, String.t()}
   def invert(image) do
     ImageRs.Nif.invert(image)
   end
@@ -188,8 +220,8 @@ defmodule ImageRs do
 
   `sigma` is a measure of how much to blur by.
   """
-  @spec blur(ImageRs.DynamicImage.t(), float()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec blur(ImageRs.t(), float()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def blur(image, sigma) do
     ImageRs.Nif.blur(image, sigma * 1.0)
   end
@@ -201,8 +233,8 @@ defmodule ImageRs do
 
   `threshold` is a control of how much to sharpen.
   """
-  @spec unsharpen(ImageRs.DynamicImage.t(), float(), integer()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec unsharpen(ImageRs.t(), float(), integer()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def unsharpen(image, sigma, threshold) do
     ImageRs.Nif.unsharpen(image, sigma * 1.0, threshold)
   end
@@ -211,10 +243,10 @@ defmodule ImageRs do
   Filters this image with the specified 3x3 kernel.
   """
   @spec filter3x3(
-          ImageRs.DynamicImage.t(),
+          ImageRs.t(),
           [number()]
         ) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def filter3x3(image, kernel) when is_list(kernel) do
     kernel = List.flatten(kernel)
 
@@ -238,8 +270,8 @@ defmodule ImageRs do
 
   Negative values decrease the contrast and positive values increase the contrast.
   """
-  @spec adjust_contrast(ImageRs.DynamicImage.t(), float()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec adjust_contrast(ImageRs.t(), float()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def adjust_contrast(image, contrast) do
     ImageRs.Nif.adjust_contrast(image, contrast * 1.0)
   end
@@ -251,8 +283,8 @@ defmodule ImageRs do
 
   Negative values decrease the brightness and positive values increase it.
   """
-  @spec brighten(ImageRs.DynamicImage.t(), integer()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec brighten(ImageRs.t(), integer()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def brighten(image, value) do
     ImageRs.Nif.brighten(image, value)
   end
@@ -266,8 +298,8 @@ defmodule ImageRs do
 
   just like the css webkit filter hue-rotate(180)
   """
-  @spec huerotate(ImageRs.DynamicImage.t(), integer()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec huerotate(ImageRs.t(), integer()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def huerotate(image, value) do
     ImageRs.Nif.huerotate(image, value)
   end
@@ -275,8 +307,8 @@ defmodule ImageRs do
   @doc """
   Flip this image vertically
   """
-  @spec flipv(ImageRs.DynamicImage.t()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec flipv(ImageRs.t()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def flipv(image) do
     ImageRs.Nif.flipv(image)
   end
@@ -284,8 +316,8 @@ defmodule ImageRs do
   @doc """
   Flip this image horizontally
   """
-  @spec fliph(ImageRs.DynamicImage.t()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec fliph(ImageRs.t()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def fliph(image) do
     ImageRs.Nif.fliph(image)
   end
@@ -293,8 +325,8 @@ defmodule ImageRs do
   @doc """
   Rotate this image 90 degrees clockwise.
   """
-  @spec rotate90(ImageRs.DynamicImage.t()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec rotate90(ImageRs.t()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def rotate90(image) do
     ImageRs.Nif.rotate90(image)
   end
@@ -302,8 +334,8 @@ defmodule ImageRs do
   @doc """
   Rotate this image 180 degrees clockwise.
   """
-  @spec rotate180(ImageRs.DynamicImage.t()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec rotate180(ImageRs.t()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def rotate180(image) do
     ImageRs.Nif.rotate180(image)
   end
@@ -311,18 +343,17 @@ defmodule ImageRs do
   @doc """
   Rotate this image 270 degrees clockwise.
   """
-  @spec rotate270(ImageRs.DynamicImage.t()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec rotate270(ImageRs.t()) ::
+          {:ok, ImageRs.t()} | {:error, String.t()}
   def rotate270(image) do
     ImageRs.Nif.rotate270(image)
   end
 
-  @spec encode_as(any(), :jpeg | :pnm) :: {:error, binary()} | {:ok, any()}
   @doc """
   Encode this image as format.
   """
-  @spec encode_as(ImageRs.DynamicImage.t(), output_format(), Keyword.t()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec encode_as(ImageRs.t(), output_format(), Keyword.t()) ::
+          {:ok, binary()} | {:error, String.t()}
   def encode_as(image, format, options \\ []) do
     with {:ok, checked_options} <- validate_output_format_and_options(format, options) do
       ImageRs.Nif.encode_as(image, format, checked_options)
@@ -332,8 +363,7 @@ defmodule ImageRs do
   @doc """
   Saves the buffer to a file at the path specified.
   """
-  @spec save(ImageRs.DynamicImage.t(), Path.t()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec save(ImageRs.t(), Path.t()) :: :ok | {:error, String.t()}
   def save(image, path) do
     ImageRs.Nif.save(image, path)
   end
@@ -341,8 +371,7 @@ defmodule ImageRs do
   @doc """
   Saves the buffer to a file at the path specified in the specified format.
   """
-  @spec save_with_format(ImageRs.DynamicImage.t(), Path.t(), output_format()) ::
-          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  @spec save_with_format(ImageRs.t(), Path.t(), output_format()) :: :ok | {:error, String.t()}
   def save_with_format(image, path, format) do
     supported_formats = supported_formats()
 
