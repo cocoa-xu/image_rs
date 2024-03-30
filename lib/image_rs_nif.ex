@@ -55,7 +55,7 @@ defmodule ImageRs.Nif do
 
   def from_file(_filename), do: :erlang.nif_error(:not_loaded)
   def from_binary(_data), do: :erlang.nif_error(:not_loaded)
-  @spec to_binary(any()) :: any()
+  def new(_height, _width, _color_type, _dtype, _data), do: :erlang.nif_error(:not_loaded)
   def to_binary(_image), do: :erlang.nif_error(:not_loaded)
   def resize(_image, _height, _width, _filter_type), do: :erlang.nif_error(:not_loaded)
 

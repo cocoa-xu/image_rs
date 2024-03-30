@@ -1,7 +1,7 @@
 defmodule ImgDecode.MixProject do
   use Mix.Project
 
-  @version "0.3.0"
+  @version "0.3.1-dev"
   @github_url "https://github.com/cocoa-xu/image_rs"
   @dev? String.ends_with?(@version, "-dev")
   @force_build? System.get_env("IMAGE_RS_BUILD") in ["1", "true"]
@@ -61,9 +61,14 @@ defmodule ImgDecode.MixProject do
 
   defp deps do
     [
+      # compilation
       {:castore, "~> 1.0 or ~> 0.1"},
       {:rustler, "~> 0.30.0", optional: not (@dev? or @force_build?)},
       {:rustler_precompiled, "~> 0.7"},
+      # optional
+      {:nx, "~> 0.4", optional: true},
+      {:kino, "~> 0.7", optional: true},
+      # docs
       {:ex_doc, "~> 0.29", only: :docs, runtime: false}
     ]
   end

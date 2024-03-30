@@ -86,6 +86,12 @@ defmodule ImageRs do
     ImageRs.Nif.from_binary(data)
   end
 
+  @spec new(pos_integer(), pos_integer(), :l | :la | :rgb | :rgba, :u8 | :u16 | :f32, binary()) ::
+          {:ok, ImageRs.DynamicImage.t()} | {:error, String.t()}
+  def new(height, width, color_type, dtype, data) do
+    ImageRs.Nif.new(height, width, color_type, dtype, data)
+  end
+
   @spec to_binary(ImageRs.DynamicImage.t()) :: {:ok, binary()} | {:error, String.t()}
   def to_binary(image) do
     ImageRs.Nif.to_binary(image)
@@ -353,23 +359,30 @@ defmodule ImageRs do
     case q do
       nil ->
         {:error, "`:quality` parameter for `:jpeg` output format must be an integer in [0, 100]"}
+
       q when is_integer(q) ->
-        if (0 <= q and q <= 100) do
+        if 0 <= q and q <= 100 do
           {:ok, %{"quality" => "#{q}"}}
         else
-          {:error, "`:quality` parameter for `:jpeg` output format must be an integer in [0, 100]"}
+          {:error,
+           "`:quality` parameter for `:jpeg` output format must be an integer in [0, 100]"}
         end
+
       q when is_binary(q) ->
         case Integer.parse(q, 10) do
           {q, ""} ->
-            if (0 <= q and q <= 100) do
+            if 0 <= q and q <= 100 do
               {:ok, %{"quality" => "#{q}"}}
             else
-              {:error, "`:quality` parameter for `:jpeg` output format must be an integer in [0, 100]"}
+              {:error,
+               "`:quality` parameter for `:jpeg` output format must be an integer in [0, 100]"}
             end
+
           :error ->
-            {:error, "`:quality` parameter for `:jpeg` output format must be an integer in [0, 100]"}
+            {:error,
+             "`:quality` parameter for `:jpeg` output format must be an integer in [0, 100]"}
         end
+
       _ ->
         {:error, "`:quality` parameter for `:jpeg` output format must be an integer in [0, 100]"}
     end
@@ -423,5 +436,87 @@ defmodule ImageRs do
       :qoi,
       :webp
     ]
+  end
+
+  if Code.ensure_loaded?(Nx) do
+    @doc """
+    Converts an `ImageRs` to a Nx tensor.
+
+    It accepts the same options as `Nx.from_binary/3`.
+    """
+    def to_nx(%ImageRs{dtype: dtype, shape: shape} = image, opts \\ []) do
+      with {:ok, data} <- ImageRs.to_binary(image) do
+        Nx.from_binary(data, dtype, opts)
+        |> Nx.reshape(List.to_tuple(shape), names: [:height, :width, :channels])
+      end
+    end
+
+    @doc """
+    Creates an `ImageRs` from a Nx tensor.
+
+    The tensor is expected to have the shape `{h, w, c}`
+    and one of the supported types (u8/u16/f32).
+    """
+    def from_nx(tensor) when is_struct(tensor, Nx.Tensor) do
+      data = Nx.to_binary(tensor)
+      dtype = tensor_type(Nx.type(tensor))
+
+      {h, w, color_type} =
+        case tensor_shape(Nx.shape(tensor)) do
+          {h, w, c} ->
+            {h, w, channel_to_image_rs_color_type(c)}
+
+          {h, w} ->
+            {h, w, :l}
+        end
+
+      new(h, w, color_type, dtype, data)
+    end
+
+    defp channel_to_image_rs_color_type(1) do
+      :l
+    end
+
+    defp channel_to_image_rs_color_type(2) do
+      :la
+    end
+
+    defp channel_to_image_rs_color_type(3) do
+      :rgb
+    end
+
+    defp channel_to_image_rs_color_type(4) do
+      :rgba
+    end
+
+    defp channel_to_image_rs_color_type(c) do
+      raise RuntimeError, """
+      Unsupported number of channels: `#{inspect(c)}`.
+      Valid number of channels should be in [1,2,3,4].
+      """
+    end
+
+    defp tensor_type({:u, 8}), do: :u8
+    defp tensor_type({:u, 16}), do: :u16
+    defp tensor_type({:f, 32}), do: :f32
+
+    defp tensor_type(type),
+      do: raise(ArgumentError, "unsupported tensor type: #{inspect(type)} (expected u8/u16/f32)")
+
+    defp tensor_shape({_, _, c} = shape) when c in 1..4,
+      do: shape
+
+    defp tensor_shape(shape),
+      do:
+        raise(
+          ArgumentError,
+          "unsupported tensor shape: #{inspect(shape)} (expected height-width-channel)"
+        )
+
+    defimpl Nx.LazyContainer do
+      def traverse(%ImageRs{dtype: dtype, shape: shape} = image, acc, fun) do
+        fun.(Nx.template(List.to_tuple(shape), dtype), fn -> ImageRs.to_nx(image) end, acc)
+      end
+    end
   end
 end

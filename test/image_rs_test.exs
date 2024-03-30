@@ -80,6 +80,91 @@ defmodule ImageRs.Test do
     end
   end
 
+  describe "interact with nx" do
+    test "to_nx" do
+      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.png"))
+      tensor = ImageRs.to_nx(image)
+
+      assert {2, 3, 4} == tensor.shape
+      assert {:u, 8} == tensor.type
+
+      assert <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190,
+               205, 145, 255, 144, 184, 200, 255>> == Nx.to_binary(tensor)
+    end
+
+    test "new image from nx" do
+      data =
+        <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190, 205,
+          145, 255, 144, 184, 200, 255>>
+
+      image_tensor =
+        data
+        |> Nx.from_binary(:u8)
+        |> Nx.reshape({3, 2, 4})
+
+      {:ok, %ImageRs{} = image} = ImageRs.from_nx(image_tensor)
+      {:ok, image_data} = ImageRs.to_binary(image)
+      assert data == image_data
+    end
+
+    test "new image from nx u16" do
+      data =
+        <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190, 205,
+          145, 255, 144, 184, 200, 255>>
+
+      image_tensor =
+        data
+        |> Nx.from_binary(:u8)
+        |> Nx.reshape({3, 2, 4})
+        |> Nx.as_type(:u16)
+
+      {:ok, %ImageRs{} = image} = ImageRs.from_nx(image_tensor)
+      {:ok, image_data} = ImageRs.to_binary(image)
+      u16_data = Nx.to_binary(image_tensor)
+      assert u16_data == image_data
+    end
+
+    test "new image from nx f32" do
+      data =
+        <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190, 205,
+          145, 255, 144, 184, 200, 255>>
+
+      image_tensor =
+        data
+        |> Nx.from_binary(:u8)
+        |> Nx.reshape({3, 2, 4})
+        |> Nx.as_type(:f32)
+
+      {:ok, %ImageRs{} = image} = ImageRs.from_nx(image_tensor)
+      {:ok, image_data} = ImageRs.to_binary(image)
+      f32_data = Nx.to_binary(image_tensor)
+      assert f32_data == image_data
+    end
+
+    invalid_dtypes = [{:f, 64}, {:u, 64}, {:s, 8}, {:s, 16}, {:s, 32}, {:s, 64}]
+
+    for dtype <- invalid_dtypes do
+      @dtype dtype
+      test "new image from nx (invalid dtype - #{inspect(dtype)})" do
+        data =
+          <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190,
+            205, 145, 255, 144, 184, 200, 255>>
+
+        image_tensor =
+          data
+          |> Nx.from_binary(:u8)
+          |> Nx.reshape({3, 2, 4})
+          |> Nx.as_type(@dtype)
+
+        assert_raise ArgumentError,
+                     "unsupported tensor type: #{inspect(@dtype)} (expected u8/u16/f32)",
+                     fn ->
+                       ImageRs.from_nx(image_tensor)
+                     end
+      end
+    end
+  end
+
   describe "image resize ops" do
     test "preserve aspect ratio, nearest" do
       {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
@@ -658,7 +743,7 @@ defmodule ImageRs.Test do
       assert :rgb == image.color_type
       assert :u8 == image.dtype
       assert [2, 3, 3] == image.shape
-      {:ok, data} = ImageRs.to_binary(image)
+      {:ok, _data} = ImageRs.to_binary(image)
 
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
@@ -710,7 +795,7 @@ defmodule ImageRs.Test do
       assert :rgb == image.color_type
       assert :u8 == image.dtype
       assert [2, 3, 3] == image.shape
-      {:ok, data} = ImageRs.to_binary(image)
+      {:ok, _data} = ImageRs.to_binary(image)
 
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data

@@ -2,7 +2,7 @@ use crate::{
     ImageRsColorType, ImageRsDataType, ImageRsDynamicImage, ImageRsError, ImageRsFilterType,
     ImageRsOutputFormat,
 };
-use image::{ColorType, DynamicImage, ImageOutputFormat};
+use image::{ColorType, DynamicImage, ImageBuffer, ImageOutputFormat};
 use rustler::{Binary, Env, NewBinary};
 use std::collections::HashMap;
 use std::io::{BufWriter, Cursor, Write};
@@ -20,6 +20,132 @@ fn from_binary(buffer: Binary) -> Result<ImageRsDynamicImage, ImageRsError> {
     Ok(ImageRsDynamicImage::new(image::load_from_memory(
         buffer.as_slice(),
     )?))
+}
+
+fn as_u16_vec(image_bytes: &[u8], width: u32, height: u32, channels: u32) -> Option<Vec<u16>> {
+    if width as usize * height as usize * channels as usize * 2 != image_bytes.len() {
+        return None;
+    }
+
+    let image_data: Vec<u16> = vec![0; width as usize * height as usize * channels as usize];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            image_bytes.as_ptr(),
+            image_data.as_ptr() as *mut u8,
+            image_bytes.len(),
+        );
+    };
+    Some(image_data)
+}
+
+fn as_f32_vec(image_bytes: &[u8], width: u32, height: u32, channels: u32) -> Option<Vec<f32>> {
+    if width as usize * height as usize * channels as usize * 4 != image_bytes.len() {
+        return None;
+    }
+
+    let image_data: Vec<f32> = vec![0f32; width as usize * height as usize * channels as usize];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            image_bytes.as_ptr(),
+            image_data.as_ptr() as *mut u8,
+            image_bytes.len(),
+        );
+    };
+    Some(image_data)
+}
+
+#[rustler::nif]
+fn new<'a>(
+    height: u32,
+    width: u32,
+    color_type: ImageRsColorType,
+    data_type: ImageRsDataType,
+    data: Binary<'a>,
+) -> Result<ImageRsDynamicImage, ImageRsError> {
+    let image_bytes = data.as_slice();
+    let image = match color_type {
+        ImageRsColorType::L => match data_type {
+            ImageRsDataType::U8 => ImageBuffer::from_raw(width, height, image_bytes.to_vec())
+                .map(|buf| DynamicImage::ImageLuma8(buf))
+                .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?,
+            ImageRsDataType::U16 => {
+                if let Some(image_data) = as_u16_vec(image_bytes, width, height, 1) {
+                    ImageBuffer::from_raw(width, height, image_data)
+                        .map(|buf| DynamicImage::ImageLuma16(buf))
+                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                } else {
+                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                }
+            }
+            _ => return Err(ImageRsError::Other("Unsupported data type".to_string())),
+        },
+        ImageRsColorType::La => match data_type {
+            ImageRsDataType::U8 => ImageBuffer::from_raw(width, height, image_bytes.to_vec())
+                .map(|buf| DynamicImage::ImageLumaA8(buf))
+                .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?,
+            ImageRsDataType::U16 => {
+                if let Some(image_data) = as_u16_vec(image_bytes, width, height, 2) {
+                    ImageBuffer::from_raw(width, height, image_data)
+                        .map(|buf| DynamicImage::ImageLumaA16(buf))
+                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                } else {
+                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                }
+            }
+            _ => return Err(ImageRsError::Other("Unsupported data type".to_string())),
+        },
+        ImageRsColorType::Rgb => match data_type {
+            ImageRsDataType::U8 => ImageBuffer::from_raw(width, height, image_bytes.to_vec())
+                .map(|buf| DynamicImage::ImageRgb8(buf))
+                .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?,
+            ImageRsDataType::U16 => {
+                if let Some(image_data) = as_u16_vec(image_bytes, width, height, 3) {
+                    ImageBuffer::from_raw(width, height, image_data)
+                        .map(|buf| DynamicImage::ImageRgb16(buf))
+                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                } else {
+                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                }
+            }
+            ImageRsDataType::F32 => {
+                if let Some(image_data) = as_f32_vec(image_bytes, width, height, 3) {
+                    ImageBuffer::from_raw(width, height, image_data)
+                        .map(|buf| DynamicImage::ImageRgb32F(buf))
+                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                } else {
+                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                }
+            }
+            _ => return Err(ImageRsError::Other("Unsupported data type".to_string())),
+        },
+        ImageRsColorType::Rgba => match data_type {
+            ImageRsDataType::U8 => ImageBuffer::from_raw(width, height, image_bytes.to_vec())
+                .map(|buf| DynamicImage::ImageRgba8(buf))
+                .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?,
+            ImageRsDataType::U16 => {
+                if let Some(image_data) = as_u16_vec(image_bytes, width, height, 4) {
+                    ImageBuffer::from_raw(width, height, image_data)
+                        .map(|buf| DynamicImage::ImageRgba16(buf))
+                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                } else {
+                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                }
+            }
+            ImageRsDataType::F32 => {
+                if let Some(image_data) = as_f32_vec(image_bytes, width, height, 4) {
+                    ImageBuffer::from_raw(width, height, image_data)
+                        .map(|buf| DynamicImage::ImageRgba32F(buf))
+                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                } else {
+                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                }
+            }
+            _ => return Err(ImageRsError::Other("Unsupported data type".to_string())),
+        },
+        _ => return Err(ImageRsError::Other("Unsupported color type".to_string())),
+    };
+
+    Ok(ImageRsDynamicImage::new(image))
 }
 
 #[rustler::nif]

@@ -34,6 +34,7 @@ rustler::init!(
     [
         from_file,
         from_binary,
+        new,
         to_binary,
         resize,
         resize_preserve_ratio,
