@@ -1,25 +1,81 @@
 use crate::{
-    ImageRsColorType, ImageRsDataType, ImageRsDynamicImage, ImageRsError, ImageRsFilterType,
-    ImageRsOutputFormat,
+    ImageRsColorType, ImageRsDataType, ImageRsDynamicImage, ImageRsFilterType, ImageRsOutputFormat,
 };
-use image::{ColorType, DynamicImage, ImageBuffer, ImageOutputFormat};
-use rustler::{Binary, Env, NewBinary};
+use image::{ColorType, DynamicImage, ImageBuffer, ImageError, ImageOutputFormat};
+use rustler::{Atom, Binary, Env, Error, NewBinary};
 use std::collections::HashMap;
+use std::io::ErrorKind as IoErrorKind;
 use std::io::{BufWriter, Cursor, Seek, Write};
-use std::result::Result;
-use std::result::Result::Ok;
 use std::vec::Vec;
-
-#[rustler::nif]
-pub fn from_file(filename: &str) -> Result<ImageRsDynamicImage, ImageRsError> {
-    Ok(ImageRsDynamicImage::new(image::open(filename)?))
+mod atoms {
+    rustler::atoms! {
+        io,
+        enoent,
+        eacces,
+        epipe,
+        eexist,
+        unknown,
+        decoding_error,
+        encoding_error,
+        parameter_error,
+        limit_error,
+        dimension_mismatch,
+        failed_already,
+        no_more_data,
+        invalid_image_data,
+        dimension_error,
+        insufficient_memory,
+        unsupported_image_data,
+        unsupported_color_type,
+        unsupported_format,
+        bad_argument,
+    }
 }
 
-#[rustler::nif]
-fn from_binary(buffer: Binary) -> Result<ImageRsDynamicImage, ImageRsError> {
-    Ok(ImageRsDynamicImage::new(image::load_from_memory(
-        buffer.as_slice(),
-    )?))
+fn io_error_to_term(err: &ImageError) -> Atom {
+    match err {
+        ImageError::IoError(io_error) => match io_error.kind() {
+            IoErrorKind::NotFound => atoms::enoent(),
+            IoErrorKind::PermissionDenied => atoms::eacces(),
+            IoErrorKind::BrokenPipe => atoms::epipe(),
+            IoErrorKind::AlreadyExists => atoms::eexist(),
+            _ => atoms::io(),
+        },
+        ImageError::Decoding(_) => atoms::decoding_error(),
+        ImageError::Encoding(_) => atoms::encoding_error(),
+        ImageError::Parameter(parameter_error) => match parameter_error.kind() {
+            image::error::ParameterErrorKind::DimensionMismatch => atoms::dimension_mismatch(),
+            image::error::ParameterErrorKind::FailedAlready => atoms::failed_already(),
+            image::error::ParameterErrorKind::NoMoreData => atoms::no_more_data(),
+            _ => atoms::parameter_error(),
+        },
+        ImageError::Limits(limit_error) => match limit_error.kind() {
+            image::error::LimitErrorKind::DimensionError => atoms::dimension_error(),
+            image::error::LimitErrorKind::InsufficientMemory => atoms::insufficient_memory(),
+            _ => atoms::limit_error(),
+        },
+        ImageError::Unsupported(unsupported_error) => match unsupported_error.kind() {
+            image::error::UnsupportedErrorKind::Color(_) => atoms::unsupported_color_type(),
+            image::error::UnsupportedErrorKind::Format(_) => atoms::unsupported_format(),
+            _ => atoms::unsupported_image_data(),
+        },
+    }
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+pub fn from_file(filename: &str) -> Result<ImageRsDynamicImage, Error> {
+    match image::open(filename) {
+        Ok(image) => Ok(ImageRsDynamicImage::new(image)),
+        Err(ref e) => Err(Error::Term(Box::new(io_error_to_term(e)))),
+    }
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+fn from_binary(buffer: Binary) -> Result<ImageRsDynamicImage, Error> {
+    match image::load_from_memory(buffer.as_slice()) {
+        Ok(image) => Ok(ImageRsDynamicImage::new(image)),
+        Err(ref e) => Err(Error::Term(Box::new(io_error_to_term(e)))),
+    }
 }
 
 fn as_u16_vec(image_bytes: &[u8], width: u32, height: u32, channels: u32) -> Option<Vec<u16>> {
@@ -54,115 +110,120 @@ fn as_f32_vec(image_bytes: &[u8], width: u32, height: u32, channels: u32) -> Opt
     Some(image_data)
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn new<'a>(
     height: u32,
     width: u32,
     color_type: ImageRsColorType,
     data_type: ImageRsDataType,
     data: Binary<'a>,
-) -> Result<ImageRsDynamicImage, ImageRsError> {
+) -> Result<ImageRsDynamicImage, Error> {
     let image_bytes = data.as_slice();
     let image = match color_type {
         ImageRsColorType::L => match data_type {
             ImageRsDataType::U8 => ImageBuffer::from_raw(width, height, image_bytes.to_vec())
                 .map(|buf| DynamicImage::ImageLuma8(buf))
-                .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?,
+                .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data()))),
             ImageRsDataType::U16 => {
                 if let Some(image_data) = as_u16_vec(image_bytes, width, height, 1) {
                     ImageBuffer::from_raw(width, height, image_data)
                         .map(|buf| DynamicImage::ImageLuma16(buf))
-                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                        .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data())))
                 } else {
-                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                    return Err(Error::Term(Box::new(atoms::invalid_image_data())));
                 }
             }
-            _ => return Err(ImageRsError::Other("Unsupported data type".to_string())),
+            _ => return Err(Error::Term(Box::new(atoms::unsupported_image_data()))),
         },
         ImageRsColorType::La => match data_type {
             ImageRsDataType::U8 => ImageBuffer::from_raw(width, height, image_bytes.to_vec())
                 .map(|buf| DynamicImage::ImageLumaA8(buf))
-                .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?,
+                .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data()))),
             ImageRsDataType::U16 => {
                 if let Some(image_data) = as_u16_vec(image_bytes, width, height, 2) {
                     ImageBuffer::from_raw(width, height, image_data)
                         .map(|buf| DynamicImage::ImageLumaA16(buf))
-                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                        .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data())))
                 } else {
-                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                    return Err(Error::Term(Box::new(atoms::invalid_image_data())));
                 }
             }
-            _ => return Err(ImageRsError::Other("Unsupported data type".to_string())),
+            _ => return Err(Error::Term(Box::new(atoms::unsupported_image_data()))),
         },
         ImageRsColorType::Rgb => match data_type {
             ImageRsDataType::U8 => ImageBuffer::from_raw(width, height, image_bytes.to_vec())
                 .map(|buf| DynamicImage::ImageRgb8(buf))
-                .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?,
+                .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data()))),
             ImageRsDataType::U16 => {
                 if let Some(image_data) = as_u16_vec(image_bytes, width, height, 3) {
                     ImageBuffer::from_raw(width, height, image_data)
                         .map(|buf| DynamicImage::ImageRgb16(buf))
-                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                        .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data())))
                 } else {
-                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                    return Err(Error::Term(Box::new(atoms::invalid_image_data())));
                 }
             }
             ImageRsDataType::F32 => {
                 if let Some(image_data) = as_f32_vec(image_bytes, width, height, 3) {
                     ImageBuffer::from_raw(width, height, image_data)
                         .map(|buf| DynamicImage::ImageRgb32F(buf))
-                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                        .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data())))
                 } else {
-                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                    return Err(Error::Term(Box::new(atoms::invalid_image_data())));
                 }
             }
-            _ => return Err(ImageRsError::Other("Unsupported data type".to_string())),
+            _ => return Err(Error::Term(Box::new(atoms::unsupported_image_data()))),
         },
         ImageRsColorType::Rgba => match data_type {
             ImageRsDataType::U8 => ImageBuffer::from_raw(width, height, image_bytes.to_vec())
                 .map(|buf| DynamicImage::ImageRgba8(buf))
-                .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?,
+                .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data()))),
             ImageRsDataType::U16 => {
                 if let Some(image_data) = as_u16_vec(image_bytes, width, height, 4) {
                     ImageBuffer::from_raw(width, height, image_data)
                         .map(|buf| DynamicImage::ImageRgba16(buf))
-                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                        .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data())))
                 } else {
-                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                    return Err(Error::Term(Box::new(atoms::invalid_image_data())));
                 }
             }
             ImageRsDataType::F32 => {
                 if let Some(image_data) = as_f32_vec(image_bytes, width, height, 4) {
                     ImageBuffer::from_raw(width, height, image_data)
                         .map(|buf| DynamicImage::ImageRgba32F(buf))
-                        .ok_or_else(|| ImageRsError::Other("Invalid image data".to_string()))?
+                        .ok_or_else(|| Error::Term(Box::new(atoms::invalid_image_data())))
                 } else {
-                    return Err(ImageRsError::Other("Invalid image data".to_string()));
+                    return Err(Error::Term(Box::new(atoms::invalid_image_data())));
                 }
             }
-            _ => return Err(ImageRsError::Other("Unsupported data type".to_string())),
+            _ => return Err(Error::Term(Box::new(atoms::unsupported_image_data()))),
         },
-        _ => return Err(ImageRsError::Other("Unsupported color type".to_string())),
+        _ => return Err(Error::Term(Box::new(atoms::unsupported_color_type()))),
     };
 
-    Ok(ImageRsDynamicImage::new(image))
+    match image {
+        Ok(image) => Ok(ImageRsDynamicImage::new(image)),
+        Err(e) => Err(e),
+    }
 }
 
-#[rustler::nif]
-fn to_binary<'a>(env: Env<'a>, image: ImageRsDynamicImage) -> Result<Binary<'a>, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn to_binary<'a>(env: Env<'a>, image: ImageRsDynamicImage) -> Result<Binary<'a>, Error> {
     let slice = image.as_bytes();
     let mut binary = NewBinary::new(env, slice.len());
-    binary.as_mut_slice().write_all(slice)?;
-    Ok(Binary::from(binary))
+    match binary.as_mut_slice().write_all(slice) {
+        Ok(_) => Ok(Binary::from(binary)),
+        Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+    }
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn resize(
     image: ImageRsDynamicImage,
     height: u32,
     width: u32,
     filter: ImageRsFilterType,
-) -> Result<ImageRsDynamicImage, ImageRsError> {
+) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.resize_exact(
         width,
         height,
@@ -170,13 +231,13 @@ fn resize(
     )))
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn resize_preserve_ratio(
     image: ImageRsDynamicImage,
     height: u32,
     width: u32,
     filter: ImageRsFilterType,
-) -> Result<ImageRsDynamicImage, ImageRsError> {
+) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.resize(
         width,
         height,
@@ -184,13 +245,13 @@ fn resize_preserve_ratio(
     )))
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn resize_to_fill(
     image: ImageRsDynamicImage,
     height: u32,
     width: u32,
     filter: ImageRsFilterType,
-) -> Result<ImageRsDynamicImage, ImageRsError> {
+) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.resize_to_fill(
         width,
         height,
@@ -198,128 +259,134 @@ fn resize_to_fill(
     )))
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn crop(
     image: ImageRsDynamicImage,
     x: u32,
     y: u32,
     height: u32,
     width: u32,
-) -> Result<ImageRsDynamicImage, ImageRsError> {
+) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(
         image.crop_imm(x, y, width, height),
     ))
 }
 
-#[rustler::nif]
-fn grayscale(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn grayscale(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.grayscale()))
 }
 
-#[rustler::nif]
-fn invert(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn invert(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, Error> {
     let mut new_image = image.clone();
     new_image.invert();
     Ok(ImageRsDynamicImage::new(new_image))
 }
 
-#[rustler::nif]
-fn blur(image: ImageRsDynamicImage, sigma: f32) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn blur(image: ImageRsDynamicImage, sigma: f32) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.blur(sigma)))
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn unsharpen(
     image: ImageRsDynamicImage,
     sigma: f32,
     threshold: i32,
-) -> Result<ImageRsDynamicImage, ImageRsError> {
+) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.unsharpen(sigma, threshold)))
 }
 
-#[rustler::nif]
-fn filter3x3(
-    image: ImageRsDynamicImage,
-    kernel: Vec<f32>,
-) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn filter3x3(image: ImageRsDynamicImage, kernel: Vec<f32>) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.filter3x3(&kernel)))
 }
 
-#[rustler::nif]
-fn adjust_contrast(
-    image: ImageRsDynamicImage,
-    c: f32,
-) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn adjust_contrast(image: ImageRsDynamicImage, c: f32) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.adjust_contrast(c)))
 }
 
-#[rustler::nif]
-fn brighten(image: ImageRsDynamicImage, value: i32) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn brighten(image: ImageRsDynamicImage, value: i32) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.brighten(value)))
 }
 
-#[rustler::nif]
-fn huerotate(image: ImageRsDynamicImage, value: i32) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn huerotate(image: ImageRsDynamicImage, value: i32) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.huerotate(value)))
 }
 
-#[rustler::nif]
-fn flipv(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn flipv(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.flipv()))
 }
 
-#[rustler::nif]
-fn fliph(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn fliph(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.fliph()))
 }
 
-#[rustler::nif]
-fn rotate90(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn rotate90(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.rotate90()))
 }
 
-#[rustler::nif]
-fn rotate180(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn rotate180(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.rotate180()))
 }
 
-#[rustler::nif]
-fn rotate270(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, ImageRsError> {
+#[rustler::nif(schedule = "DirtyCpu")]
+fn rotate270(image: ImageRsDynamicImage) -> Result<ImageRsDynamicImage, Error> {
     Ok(ImageRsDynamicImage::new(image.rotate270()))
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn encode_as<'a>(
     env: Env<'a>,
     image: ImageRsDynamicImage,
     format: ImageRsOutputFormat,
     options: HashMap<String, String>,
-) -> Result<Binary<'a>, ImageRsError> {
+) -> Result<Binary<'a>, Error> {
     let c = Cursor::new(Vec::new());
     let mut buffer = BufWriter::new(c);
     into_output_format(&mut buffer, &image, format, &options)?;
 
-    buffer.seek(std::io::SeekFrom::Start(0))?;
-    let cursor = buffer.get_ref();
-    let bytes = cursor.get_ref();
+    match buffer.seek(std::io::SeekFrom::Start(0)) {
+        Ok(_) => {
+            let cursor = buffer.get_ref();
+            let bytes = cursor.get_ref();
 
-    let mut binary = NewBinary::new(env, bytes.len());
-    binary.as_mut_slice().write_all(bytes)?;
-    Ok(Binary::from(binary))
+            let mut binary = NewBinary::new(env, bytes.len());
+            match binary.as_mut_slice().write_all(bytes) {
+                Ok(_) => Ok(Binary::from(binary)),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
+        }
+        Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+    }
 }
 
-#[rustler::nif]
-fn save(image: ImageRsDynamicImage, path: String) -> Result<(), ImageRsError> {
-    Ok(image.save(path)?)
+#[rustler::nif(schedule = "DirtyIo")]
+fn save(image: ImageRsDynamicImage, path: String) -> Result<(), Error> {
+    match image.save(path) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+    }
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyIo")]
 fn save_with_format(
     image: ImageRsDynamicImage,
     path: String,
     format: ImageRsOutputFormat,
-) -> Result<(), ImageRsError> {
-    Ok(image.save_with_format(path, format.into())?)
+) -> Result<(), Error> {
+    match image.save_with_format(path, format.into()) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+    }
 }
 
 pub fn get_image_detail(
@@ -351,28 +418,33 @@ fn into_output_format<W: std::io::Write + Seek>(
     image: &ImageRsDynamicImage,
     format: ImageRsOutputFormat,
     options: &HashMap<String, String>,
-) -> Result<(), ImageRsError> {
+) -> Result<(), Error> {
     let ((height, width, _channels), _color, _dtype) = get_image_detail(&image);
     let buf = image.as_bytes();
     let color = image.color();
     match format {
         #[cfg(feature = "png")]
         ImageRsOutputFormat::Png => {
-            png::PngEncoder::new(buffered_write).write_image(buf, width, height, color)?;
-            Ok(())
+            match png::PngEncoder::new(buffered_write).write_image(buf, width, height, color) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "jpeg")]
         ImageRsOutputFormat::Jpeg => {
             if let Some(quality_string) = options.get("quality") {
                 if let Ok(q) = quality_string.parse::<u8>() {
-                    jpeg::JpegEncoder::new_with_quality(buffered_write, q)
-                        .write_image(buf, width, height, color)?;
-                    Ok(())
+                    match jpeg::JpegEncoder::new_with_quality(buffered_write, q)
+                        .write_image(buf, width, height, color)
+                    {
+                        Ok(_) => Ok(()),
+                        Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+                    }
                 } else {
-                    Err(ImageRsError::Other("bad argument".to_string()))
+                    Err(Error::Term(Box::new(atoms::bad_argument())))
                 }
             } else {
-                Err(ImageRsError::Other("bad argument".to_string()))
+                Err(Error::Term(Box::new(atoms::bad_argument())))
             }
         }
         #[cfg(feature = "pnm")]
@@ -405,79 +477,107 @@ fn into_output_format<W: std::io::Write + Seek>(
                                     ))
                                 }
                             } else {
-                                Err(ImageRsError::Other("bad argument".to_string()))
+                                Err(Error::Term(Box::new(atoms::bad_argument())))
                             }
                         } else {
-                            Err(ImageRsError::Other("bad argument".to_string()))
+                            Err(Error::Term(Box::new(atoms::bad_argument())))
                         }
                     }
                 } else {
-                    Err(ImageRsError::Other("bad argument".to_string()))
+                    Err(Error::Term(Box::new(atoms::bad_argument())))
                 }
             } else {
-                Err(ImageRsError::Other("bad argument".to_string()))
+                Err(Error::Term(Box::new(atoms::bad_argument())))
             };
             if let Ok(ImageOutputFormat::Pnm(subtype)) = format {
-                pnm::PnmEncoder::new(buffered_write)
+                match pnm::PnmEncoder::new(buffered_write)
                     .with_subtype(subtype)
-                    .write_image(buf, width, height, color)?;
-                Ok(())
+                    .write_image(buf, width, height, color)
+                {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+                }
             } else {
-                Err(ImageRsError::Other("bad argument".to_string()))
+                Err(Error::Term(Box::new(atoms::bad_argument())))
             }
         }
         #[cfg(feature = "gif")]
         ImageRsOutputFormat::Gif => {
-            gif::GifEncoder::new(buffered_write).encode(buf, width, height, color)?;
-            Ok(())
+            match gif::GifEncoder::new(buffered_write).encode(buf, width, height, color) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "ico")]
         ImageRsOutputFormat::Ico => {
-            ico::IcoEncoder::new(buffered_write).write_image(buf, width, height, color)?;
-            Ok(())
+            match ico::IcoEncoder::new(buffered_write).write_image(buf, width, height, color) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "bmp")]
         ImageRsOutputFormat::Bmp => {
-            bmp::BmpEncoder::new(buffered_write).write_image(buf, width, height, color)?;
-            Ok(())
+            match bmp::BmpEncoder::new(buffered_write).write_image(buf, width, height, color) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "farbfeld")]
         ImageRsOutputFormat::Farbfeld => {
-            farbfeld::FarbfeldEncoder::new(buffered_write)
-                .write_image(buf, width, height, color)?;
-            Ok(())
+            match farbfeld::FarbfeldEncoder::new(buffered_write)
+                .write_image(buf, width, height, color)
+            {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "tga")]
         ImageRsOutputFormat::Tga => {
-            tga::TgaEncoder::new(buffered_write).write_image(buf, width, height, color)?;
-            Ok(())
+            match tga::TgaEncoder::new(buffered_write).write_image(buf, width, height, color) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
-        #[cfg(feature = "exr")]
+        #[cfg(feature = "openexr")]
         ImageRsOutputFormat::Exr => {
-            openexr::OpenExrEncoder::new(buffered_write).write_image(buf, width, height, color)?;
-            Ok(())
+            match openexr::OpenExrEncoder::new(buffered_write)
+                .write_image(buf, width, height, color)
+            {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "tiff")]
         ImageRsOutputFormat::Tiff => {
-            tiff::TiffEncoder::new(buffered_write).write_image(buf, width, height, color)?;
-            Ok(())
+            match tiff::TiffEncoder::new(buffered_write).write_image(buf, width, height, color) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "avif")]
         ImageRsOutputFormat::Avif => {
-            avif::AvifEncoder::new(buffered_write).write_image(buf, width, height, color)?;
-            Ok(())
+            match avif::AvifEncoder::new(buffered_write).write_image(buf, width, height, color) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "qoi")]
         ImageRsOutputFormat::Qoi => {
-            qoi::QoiEncoder::new(buffered_write).write_image(buf, width, height, color)?;
-            Ok(())
+            match qoi::QoiEncoder::new(buffered_write).write_image(buf, width, height, color) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }
         }
         #[cfg(feature = "webp")]
         ImageRsOutputFormat::Webp => {
-            webp::WebPEncoder::new_lossless(buffered_write)
-                .write_image(buf, width, height, color)?;
+            match webp::WebPEncoder::new_lossless(buffered_write)
+                .write_image(buf, width, height, color)
+            {
+                Ok(_) => Ok(()),
+                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
+            }?;
             Ok(())
         }
-        _ => Err(ImageRsError::Other("Unsupported format".to_string())),
+        _ => Err(Error::Term(Box::new(atoms::unsupported_format()))),
     }
 }

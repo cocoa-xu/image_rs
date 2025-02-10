@@ -474,9 +474,13 @@ defmodule ImageRs do
     It accepts the same options as `Nx.from_binary/3`.
     """
     def to_nx(%ImageRs{dtype: dtype, shape: shape} = image, opts \\ []) do
-      with {:ok, data} <- ImageRs.to_binary(image) do
-        Nx.from_binary(data, dtype, opts)
-        |> Nx.reshape(List.to_tuple(shape), names: [:height, :width, :channels])
+      case ImageRs.to_binary(image) do
+        data when is_binary(data) ->
+          Nx.from_binary(data, dtype, opts)
+          |> Nx.reshape(List.to_tuple(shape), names: [:height, :width, :channels])
+
+        error ->
+          error
       end
     end
 
