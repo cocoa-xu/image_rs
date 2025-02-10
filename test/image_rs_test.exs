@@ -3,8 +3,12 @@ defmodule ImageRs.Test do
   doctest ImageRs
 
   describe "decode image" do
+    test "from invalid png file" do
+      {:error, :enoent} = ImageRs.from_file(Path.join(__DIR__, "test23.png"))
+    end
+
     test "from png file" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.png"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.png"))
       assert 3 == image.width
       assert 2 == image.height
       assert 4 == image.channels
@@ -12,13 +16,12 @@ defmodule ImageRs.Test do
       assert :u8 == image.dtype
       assert [2, 3, 4] == image.shape
 
-      assert {:ok,
-              <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190,
-                205, 145, 255, 144, 184, 200, 255>>} == ImageRs.to_binary(image)
+      assert <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190,
+               205, 145, 255, 144, 184, 200, 255>> == ImageRs.to_binary(image)
     end
 
     test "from jpg file" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -33,14 +36,14 @@ defmodule ImageRs.Test do
 
     test "from png data" do
       {:ok, data} = File.read(Path.join(__DIR__, "test.png"))
-      {:ok, %ImageRs{} = image} = ImageRs.from_binary(data)
+      %ImageRs{} = image = ImageRs.from_binary(data)
       assert 3 == image.width
       assert 2 == image.height
       assert 4 == image.channels
       assert :rgba == image.color_type
       assert :u8 == image.dtype
       assert [2, 3, 4] == image.shape
-      {:ok, data} = ImageRs.to_binary(image)
+      data = ImageRs.to_binary(image)
 
       assert <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190,
                205, 145, 255, 144, 184, 200, 255>> == data
@@ -48,14 +51,15 @@ defmodule ImageRs.Test do
 
     test "from jpg data" do
       {:ok, data} = File.read(Path.join(__DIR__, "test.jpg"))
-      {:ok, %ImageRs{} = image} = ImageRs.from_binary(data)
+      %ImageRs{} = image = ImageRs.from_binary(data)
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
       assert :rgb == image.color_type
       assert :u8 == image.dtype
       assert [2, 3, 3] == image.shape
-      {:ok, _data} = ImageRs.to_binary(image)
+      data = ImageRs.to_binary(image)
+      assert is_binary(data)
 
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
@@ -63,8 +67,8 @@ defmodule ImageRs.Test do
 
     test "to_binary with png" do
       {:ok, data} = File.read(Path.join(__DIR__, "test.png"))
-      {:ok, %ImageRs{} = image} = ImageRs.from_binary(data)
-      {:ok, data} = ImageRs.to_binary(image)
+      %ImageRs{} = image = ImageRs.from_binary(data)
+      data = ImageRs.to_binary(image)
 
       assert <<241, 145, 126, 255, 136, 190, 78, 255, 68, 122, 183, 255, 244, 196, 187, 255, 190,
                205, 145, 255, 144, 184, 200, 255>> == data
@@ -72,8 +76,9 @@ defmodule ImageRs.Test do
 
     test "to_binary with jpg" do
       {:ok, data} = File.read(Path.join(__DIR__, "test.jpg"))
-      {:ok, %ImageRs{} = image} = ImageRs.from_binary(data)
-      {:ok, _data} = ImageRs.to_binary(image)
+      %ImageRs{} = image = ImageRs.from_binary(data)
+      data = ImageRs.to_binary(image)
+      assert is_binary(data)
 
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
@@ -82,7 +87,7 @@ defmodule ImageRs.Test do
 
   describe "interact with nx" do
     test "to_nx" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.png"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.png"))
       tensor = ImageRs.to_nx(image)
 
       assert {2, 3, 4} == tensor.shape
@@ -102,8 +107,8 @@ defmodule ImageRs.Test do
         |> Nx.from_binary(:u8)
         |> Nx.reshape({3, 2, 4})
 
-      {:ok, %ImageRs{} = image} = ImageRs.from_nx(image_tensor)
-      {:ok, image_data} = ImageRs.to_binary(image)
+      %ImageRs{} = image = ImageRs.from_nx(image_tensor)
+      image_data = ImageRs.to_binary(image)
       assert data == image_data
     end
 
@@ -118,8 +123,8 @@ defmodule ImageRs.Test do
         |> Nx.reshape({3, 2, 4})
         |> Nx.as_type(:u16)
 
-      {:ok, %ImageRs{} = image} = ImageRs.from_nx(image_tensor)
-      {:ok, image_data} = ImageRs.to_binary(image)
+      %ImageRs{} = image = ImageRs.from_nx(image_tensor)
+      image_data = ImageRs.to_binary(image)
       u16_data = Nx.to_binary(image_tensor)
       assert u16_data == image_data
     end
@@ -135,8 +140,8 @@ defmodule ImageRs.Test do
         |> Nx.reshape({3, 2, 4})
         |> Nx.as_type(:f32)
 
-      {:ok, %ImageRs{} = image} = ImageRs.from_nx(image_tensor)
-      {:ok, image_data} = ImageRs.to_binary(image)
+      %ImageRs{} = image = ImageRs.from_nx(image_tensor)
+      image_data = ImageRs.to_binary(image)
       f32_data = Nx.to_binary(image_tensor)
       assert f32_data == image_data
     end
@@ -167,7 +172,7 @@ defmodule ImageRs.Test do
 
   describe "image resize ops" do
     test "preserve aspect ratio, nearest" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -178,7 +183,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_preserve_ratio(image, new_height, new_width, :nearest)
 
       assert 20 == new_image.width
@@ -190,7 +195,7 @@ defmodule ImageRs.Test do
     end
 
     test "preserve aspect ratio, triangle" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -201,7 +206,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_preserve_ratio(image, new_height, new_width, :triangle)
 
       assert 20 == new_image.width
@@ -213,7 +218,7 @@ defmodule ImageRs.Test do
     end
 
     test "preserve aspect ratio, catmull_rom" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -224,7 +229,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_preserve_ratio(image, new_height, new_width, :catmull_rom)
 
       assert 20 == new_image.width
@@ -236,7 +241,7 @@ defmodule ImageRs.Test do
     end
 
     test "preserve aspect ratio, gaussian" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -247,7 +252,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_preserve_ratio(image, new_height, new_width, :gaussian)
 
       assert 20 == new_image.width
@@ -259,7 +264,7 @@ defmodule ImageRs.Test do
     end
 
     test "preserve aspect ratio, lanczos3" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -270,7 +275,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_preserve_ratio(image, new_height, new_width, :lanczos3)
 
       assert 20 == new_image.width
@@ -282,7 +287,7 @@ defmodule ImageRs.Test do
     end
 
     test "not preserve aspect ratio, nearest" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -293,7 +298,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} = ImageRs.resize(image, new_height, new_width, :nearest)
+      new_image = ImageRs.resize(image, new_height, new_width, :nearest)
 
       assert 20 == new_image.width
       assert 20 == new_image.height
@@ -304,7 +309,7 @@ defmodule ImageRs.Test do
     end
 
     test "not preserve aspect ratio, triangle" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -315,7 +320,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} = ImageRs.resize(image, new_height, new_width, :triangle)
+      new_image = ImageRs.resize(image, new_height, new_width, :triangle)
 
       assert 20 == new_image.width
       assert 20 == new_image.height
@@ -326,7 +331,7 @@ defmodule ImageRs.Test do
     end
 
     test "not preserve aspect ratio, catmull_rom" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -337,7 +342,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} = ImageRs.resize(image, new_height, new_width, :catmull_rom)
+      new_image = ImageRs.resize(image, new_height, new_width, :catmull_rom)
 
       assert 20 == new_image.width
       assert 20 == new_image.height
@@ -348,7 +353,7 @@ defmodule ImageRs.Test do
     end
 
     test "not preserve aspect ratio, gaussian" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -359,7 +364,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} = ImageRs.resize(image, new_height, new_width, :gaussian)
+      new_image = ImageRs.resize(image, new_height, new_width, :gaussian)
 
       assert 20 == new_image.width
       assert 20 == new_image.height
@@ -370,7 +375,7 @@ defmodule ImageRs.Test do
     end
 
     test "not preserve aspect ratio, lanczos3" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -381,7 +386,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} = ImageRs.resize(image, new_height, new_width, :lanczos3)
+      new_image = ImageRs.resize(image, new_height, new_width, :lanczos3)
 
       assert 20 == new_image.width
       assert 20 == new_image.height
@@ -392,7 +397,7 @@ defmodule ImageRs.Test do
     end
 
     test "to fill, nearest" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -403,7 +408,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_to_fill(image, new_height, new_width, :nearest)
 
       assert 20 == new_image.width
@@ -415,7 +420,7 @@ defmodule ImageRs.Test do
     end
 
     test "to fill, triangle" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -426,7 +431,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_to_fill(image, new_height, new_width, :triangle)
 
       assert 20 == new_image.width
@@ -438,7 +443,7 @@ defmodule ImageRs.Test do
     end
 
     test "to fill, catmull_rom" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -449,7 +454,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_to_fill(image, new_height, new_width, :catmull_rom)
 
       assert 20 == new_image.width
@@ -461,7 +466,7 @@ defmodule ImageRs.Test do
     end
 
     test "to fill, gaussian" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -472,7 +477,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_to_fill(image, new_height, new_width, :gaussian)
 
       assert 20 == new_image.width
@@ -484,7 +489,7 @@ defmodule ImageRs.Test do
     end
 
     test "to fill, lanczos3" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -495,7 +500,7 @@ defmodule ImageRs.Test do
       new_height = 20
       new_width = 20
 
-      {:ok, new_image} =
+      new_image =
         ImageRs.resize_to_fill(image, new_height, new_width, :lanczos3)
 
       assert 20 == new_image.width
@@ -509,7 +514,7 @@ defmodule ImageRs.Test do
 
   describe "image crop ops" do
     test "crop an image" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -521,7 +526,7 @@ defmodule ImageRs.Test do
       y = 0
       height = 1
       width = 2
-      {:ok, new_image} = ImageRs.crop(image, x, y, height, width)
+      new_image = ImageRs.crop(image, x, y, height, width)
 
       assert 2 == new_image.width
       assert 1 == new_image.height
@@ -532,7 +537,7 @@ defmodule ImageRs.Test do
     end
 
     test "crop an image out of bounds" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -544,7 +549,7 @@ defmodule ImageRs.Test do
       y = 0
       height = 4
       width = 4
-      {:ok, new_image} = ImageRs.crop(image, x, y, height, width)
+      new_image = ImageRs.crop(image, x, y, height, width)
 
       assert 3 == new_image.width
       assert 2 == new_image.height
@@ -557,7 +562,7 @@ defmodule ImageRs.Test do
 
   describe "other image ops" do
     test "grayscale" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -569,7 +574,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.grayscale(image)
+      new_image = ImageRs.grayscale(image)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 1 == new_image.channels
@@ -581,7 +586,7 @@ defmodule ImageRs.Test do
     end
 
     test "invert" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -593,7 +598,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.invert(image)
+      new_image = ImageRs.invert(image)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -607,7 +612,7 @@ defmodule ImageRs.Test do
     end
 
     test "blur" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -619,7 +624,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.blur(image, 2.0)
+      new_image = ImageRs.blur(image, 2.0)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -633,7 +638,7 @@ defmodule ImageRs.Test do
     end
 
     test "unsharpen" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -645,7 +650,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.unsharpen(image, 2.0, 3)
+      new_image = ImageRs.unsharpen(image, 2.0, 3)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -659,7 +664,7 @@ defmodule ImageRs.Test do
     end
 
     test "filter3x3" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -671,7 +676,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.filter3x3(image, [[1, 2, 1], [1, 0, 1], [-1, 0, 1]])
+      new_image = ImageRs.filter3x3(image, [[1, 2, 1], [1, 0, 1], [-1, 0, 1]])
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -684,7 +689,7 @@ defmodule ImageRs.Test do
     end
 
     test "adjust_contrast" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -696,7 +701,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.adjust_contrast(image, 1)
+      new_image = ImageRs.adjust_contrast(image, 1)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -710,7 +715,7 @@ defmodule ImageRs.Test do
     end
 
     test "brighten" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -722,7 +727,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.brighten(image, 10)
+      new_image = ImageRs.brighten(image, 10)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -736,19 +741,20 @@ defmodule ImageRs.Test do
     end
 
     test "huerotate" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
       assert :rgb == image.color_type
       assert :u8 == image.dtype
       assert [2, 3, 3] == image.shape
-      {:ok, _data} = ImageRs.to_binary(image)
+      data = ImageRs.to_binary(image)
+      assert is_binary(data)
 
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.huerotate(image, 42)
+      new_image = ImageRs.huerotate(image, 42)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -762,7 +768,7 @@ defmodule ImageRs.Test do
     end
 
     test "flipv" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -774,7 +780,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.flipv(image)
+      new_image = ImageRs.flipv(image)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -788,19 +794,20 @@ defmodule ImageRs.Test do
     end
 
     test "fliph" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
       assert :rgb == image.color_type
       assert :u8 == image.dtype
       assert [2, 3, 3] == image.shape
-      {:ok, _data} = ImageRs.to_binary(image)
+      data = ImageRs.to_binary(image)
+      assert is_binary(data)
 
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.fliph(image)
+      new_image = ImageRs.fliph(image)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -814,7 +821,7 @@ defmodule ImageRs.Test do
     end
 
     test "rotate90" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -826,7 +833,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.rotate90(image)
+      new_image = ImageRs.rotate90(image)
       assert 2 == new_image.width
       assert 3 == new_image.height
       assert 3 == new_image.channels
@@ -840,7 +847,7 @@ defmodule ImageRs.Test do
     end
 
     test "rotate180" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -852,7 +859,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.rotate180(image)
+      new_image = ImageRs.rotate180(image)
       assert 3 == new_image.width
       assert 2 == new_image.height
       assert 3 == new_image.channels
@@ -866,7 +873,7 @@ defmodule ImageRs.Test do
     end
 
     test "rotate270" do
-      {:ok, %ImageRs{} = image} = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
+      %ImageRs{} = image = ImageRs.from_file(Path.join(__DIR__, "test.jpg"))
       assert 3 == image.width
       assert 2 == image.height
       assert 3 == image.channels
@@ -878,7 +885,7 @@ defmodule ImageRs.Test do
       # assert <<180, 128, 70, 148, 128, 78, 89, 134, 101, 222, 170, 112, 182, 162, 112, 112, 157,
       #          124>> == data
 
-      {:ok, new_image} = ImageRs.rotate270(image)
+      new_image = ImageRs.rotate270(image)
       assert 2 == new_image.width
       assert 3 == new_image.height
       assert 3 == new_image.channels

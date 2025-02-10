@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 anyhow = "1"
 image = "0"
-rustler = "0.30.0"
+rustler = "0.36"
 thiserror = "1"
 
 [features]
