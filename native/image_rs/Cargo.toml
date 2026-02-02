@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 anyhow = "1"
-image = "0"
+image = "0.25"
 rustler = "0.36"
 thiserror = "1"
 
@@ -28,21 +28,13 @@ default = [
     "webp",
     "bmp",
     "hdr",
-    "dxt",
     "dds",
-    "farbfeld",
-    "jpeg_rayon",
-    "openexr",
     "qoi",
 ]
 avif = ["image/avif"]
-dxt = ["image/dxt"]
-dds = ["image/dxt"]
-farbfeld = ["image/farbfeld"]
+dds = ["image/dds"]
 hdr = ["image/hdr"]
 ico = ["image/ico"]
-jpeg_rayon = ["image/jpeg_rayon"]
-openexr = ["image/openexr"]
 pnm = ["image/pnm"]
 qoi = ["image/qoi"]
 tga = ["image/tga"]

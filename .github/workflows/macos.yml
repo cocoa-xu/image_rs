@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   mix_test:
-    runs-on: macos-13
+    runs-on: macos-14
     env:
       MIX_ENV: test
       ELIXIR_VERSION: "1.16.0"
@@ -27,7 +27,7 @@ jobs:
       matrix:
         otp_version: ["25.3.2.8", "26.2.2"]
 
-    name: macOS x86_64 - OTP ${{ matrix.otp_version }}
+    name: macOS aarch64 - OTP ${{ matrix.otp_version }}
 
     steps:
       - name: Checkout

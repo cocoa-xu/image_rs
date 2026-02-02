@@ -1,7 +1,7 @@
 use crate::{
     ImageRsColorType, ImageRsDataType, ImageRsDynamicImage, ImageRsFilterType, ImageRsOutputFormat,
 };
-use image::{ColorType, DynamicImage, ImageBuffer, ImageError, ImageOutputFormat};
+use image::{ColorType, DynamicImage, ImageBuffer, ImageError};
 use rustler::{Atom, Binary, Env, Error, NewBinary};
 use std::collections::HashMap;
 use std::io::ErrorKind as IoErrorKind;
@@ -425,7 +425,7 @@ fn into_output_format<W: std::io::Write + Seek>(
     match format {
         #[cfg(feature = "png")]
         ImageRsOutputFormat::Png => {
-            match png::PngEncoder::new(buffered_write).write_image(buf, width, height, color) {
+            match png::PngEncoder::new(buffered_write).write_image(buf, width, height, color.into()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
             }
@@ -435,7 +435,7 @@ fn into_output_format<W: std::io::Write + Seek>(
             if let Some(quality_string) = options.get("quality") {
                 if let Ok(q) = quality_string.parse::<u8>() {
                     match jpeg::JpegEncoder::new_with_quality(buffered_write, q)
-                        .write_image(buf, width, height, color)
+                        .write_image(buf, width, height, color.into())
                     {
                         Ok(_) => Ok(()),
                         Err(_) => Err(Error::Term(Box::new(atoms::io()))),
@@ -449,32 +449,24 @@ fn into_output_format<W: std::io::Write + Seek>(
         }
         #[cfg(feature = "pnm")]
         ImageRsOutputFormat::Pnm => {
-            let format = if let Some(subtype) = options.get("subtype") {
+            let subtype_result: Result<pnm::PnmSubtype, Error> = if let Some(subtype) = options.get("subtype") {
                 if ["bitmap", "graymap", "pixmap", "arbitrarymap"].contains(&&subtype[..]) {
                     if subtype == "arbitrarymap" {
-                        Ok(ImageOutputFormat::Pnm(
-                            image::codecs::pnm::PnmSubtype::ArbitraryMap,
-                        ))
+                        Ok(pnm::PnmSubtype::ArbitraryMap)
                     } else {
                         if let Some(encoding) = options.get("encoding") {
                             if ["binary", "ascii"].contains(&&encoding[..]) {
                                 let encoding = if encoding == "binary" {
-                                    image::codecs::pnm::SampleEncoding::Binary
+                                    pnm::SampleEncoding::Binary
                                 } else {
-                                    image::codecs::pnm::SampleEncoding::Ascii
+                                    pnm::SampleEncoding::Ascii
                                 };
                                 if subtype == "bitmap" {
-                                    Ok(ImageOutputFormat::Pnm(
-                                        image::codecs::pnm::PnmSubtype::Bitmap(encoding),
-                                    ))
+                                    Ok(pnm::PnmSubtype::Bitmap(encoding))
                                 } else if subtype == "graymap" {
-                                    Ok(ImageOutputFormat::Pnm(
-                                        image::codecs::pnm::PnmSubtype::Graymap(encoding),
-                                    ))
+                                    Ok(pnm::PnmSubtype::Graymap(encoding))
                                 } else {
-                                    Ok(ImageOutputFormat::Pnm(
-                                        image::codecs::pnm::PnmSubtype::Pixmap(encoding),
-                                    ))
+                                    Ok(pnm::PnmSubtype::Pixmap(encoding))
                                 }
                             } else {
                                 Err(Error::Term(Box::new(atoms::bad_argument())))
@@ -489,10 +481,10 @@ fn into_output_format<W: std::io::Write + Seek>(
             } else {
                 Err(Error::Term(Box::new(atoms::bad_argument())))
             };
-            if let Ok(ImageOutputFormat::Pnm(subtype)) = format {
+            if let Ok(subtype) = subtype_result {
                 match pnm::PnmEncoder::new(buffered_write)
                     .with_subtype(subtype)
-                    .write_image(buf, width, height, color)
+                    .write_image(buf, width, height, color.into())
                 {
                     Ok(_) => Ok(()),
                     Err(_) => Err(Error::Term(Box::new(atoms::io()))),
@@ -503,67 +495,49 @@ fn into_output_format<W: std::io::Write + Seek>(
         }
         #[cfg(feature = "gif")]
         ImageRsOutputFormat::Gif => {
-            match gif::GifEncoder::new(buffered_write).encode(buf, width, height, color) {
+            match gif::GifEncoder::new(buffered_write).encode(buf, width, height, color.into()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
             }
         }
         #[cfg(feature = "ico")]
         ImageRsOutputFormat::Ico => {
-            match ico::IcoEncoder::new(buffered_write).write_image(buf, width, height, color) {
+            match ico::IcoEncoder::new(buffered_write).write_image(buf, width, height, color.into()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
             }
         }
         #[cfg(feature = "bmp")]
         ImageRsOutputFormat::Bmp => {
-            match bmp::BmpEncoder::new(buffered_write).write_image(buf, width, height, color) {
-                Ok(_) => Ok(()),
-                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
-            }
-        }
-        #[cfg(feature = "farbfeld")]
-        ImageRsOutputFormat::Farbfeld => {
-            match farbfeld::FarbfeldEncoder::new(buffered_write)
-                .write_image(buf, width, height, color)
-            {
+            match bmp::BmpEncoder::new(buffered_write).write_image(buf, width, height, color.into()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
             }
         }
         #[cfg(feature = "tga")]
         ImageRsOutputFormat::Tga => {
-            match tga::TgaEncoder::new(buffered_write).write_image(buf, width, height, color) {
-                Ok(_) => Ok(()),
-                Err(_) => Err(Error::Term(Box::new(atoms::io()))),
-            }
-        }
-        #[cfg(feature = "openexr")]
-        ImageRsOutputFormat::Exr => {
-            match openexr::OpenExrEncoder::new(buffered_write)
-                .write_image(buf, width, height, color)
-            {
+            match tga::TgaEncoder::new(buffered_write).write_image(buf, width, height, color.into()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
             }
         }
         #[cfg(feature = "tiff")]
         ImageRsOutputFormat::Tiff => {
-            match tiff::TiffEncoder::new(buffered_write).write_image(buf, width, height, color) {
+            match tiff::TiffEncoder::new(buffered_write).write_image(buf, width, height, color.into()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
             }
         }
         #[cfg(feature = "avif")]
         ImageRsOutputFormat::Avif => {
-            match avif::AvifEncoder::new(buffered_write).write_image(buf, width, height, color) {
+            match avif::AvifEncoder::new(buffered_write).write_image(buf, width, height, color.into()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
             }
         }
         #[cfg(feature = "qoi")]
         ImageRsOutputFormat::Qoi => {
-            match qoi::QoiEncoder::new(buffered_write).write_image(buf, width, height, color) {
+            match qoi::QoiEncoder::new(buffered_write).write_image(buf, width, height, color.into()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
             }
@@ -571,7 +545,7 @@ fn into_output_format<W: std::io::Write + Seek>(
         #[cfg(feature = "webp")]
         ImageRsOutputFormat::Webp => {
             match webp::WebPEncoder::new_lossless(buffered_write)
-                .write_image(buf, width, height, color)
+                .write_image(buf, width, height, color.into())
             {
                 Ok(_) => Ok(()),
                 Err(_) => Err(Error::Term(Box::new(atoms::io()))),
