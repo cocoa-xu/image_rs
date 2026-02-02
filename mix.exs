@@ -1,7 +1,7 @@
 defmodule ImgDecode.MixProject do
   use Mix.Project
 
-  @version "0.4.1-dev"
+  @version "0.5.0"
   @github_url "https://github.com/cocoa-xu/image_rs"
   @dev? String.ends_with?(@version, "-dev")
   @force_build? System.get_env("IMAGE_RS_BUILD") in ["1", "true"]
